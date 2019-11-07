@@ -20,6 +20,7 @@ namespace vob::img::png
 		std::array<char, 8> header{};
 		a_inputStream.read(&header[0], header.size());
 		a_inputStream.seekg(-8, std::ios_base::cur);
+
 		return header[0] == '\x89' && header[1] == 'P' && header[2] == 'N'
 			&& header[3] == 'G' && header[4] == '\r' && header[5] == '\n'
 			&& header[6] == '\x1a' && header[7] == '\n';
@@ -490,7 +491,8 @@ namespace vob::img::png::detail
 		, AllocatorType const& a_allocator
 	)
 	{
-		std::vector<std::uint8_t, AllocatorType> r_data{ a_allocator };
+		using Allocator = sta::ReboundAlloc<AllocatorType, std::uint8_t>;
+		std::vector<std::uint8_t, Allocator> r_data{ Allocator{ a_allocator} };
 		r_data.resize(a_height * a_width * a_dataSize);
 		for (auto i = 0u; i < a_height; ++i)
 		{
@@ -672,13 +674,15 @@ namespace vob::img::png::detail
 	auto toImage(
 		Header const& a_header
 		, std::vector<std::uint8_t, DataAllocatorType> const& a_data
-		, ImageAllocatorType a_imageAllocator
+		, ImageAllocatorType const& a_imageAllocator
 	)
 	{
-		Image<t_outColorType, OutChannelType, ImageAllocatorType> r_image{
+		using Pixel = Pixel<t_outColorType, OutChannelType>;
+		using PixelAllocator = sta::ReboundAlloc<ImageAllocatorType, Pixel>;
+		Image<t_outColorType, OutChannelType, PixelAllocator> r_image{
 			a_header.m_height
 			, a_header.m_width
-			, a_imageAllocator
+			, PixelAllocator{ a_imageAllocator }
 		};
 
 		auto const bytesPerPixel = computeBytesPerPixel(a_header);
@@ -731,10 +735,7 @@ namespace vob::img::png::detail
 		}
 		default:
 			assert(false && "Channel depth not supported");
-			return Image<t_outColorType, OutChannelType, ImageAllocatorType>{
-				0, 0
-				, a_imageAllocator
-			};
+			throw sta::NotImplemented{};
 		}
 	}
 
@@ -780,10 +781,7 @@ namespace vob::img::png::detail
 		}
 		default:
 			assert(false && "Color type not supported");
-			return Image<t_outColorType, OutChannelType, ImageAllocatorType>{
-				0, 0
-				, a_imageAllocator
-			};
+			throw sta::NotImplemented{};
 		}
 	}
 
@@ -812,8 +810,14 @@ namespace vob::img::png::detail
 		auto const header = readHeaderChunk(a_inputStream);
 		assert(header.m_colorType == 2 || header.m_colorType == 6
 			&& "Color type not supported");
+		sta::expect<sta::NotImplemented>(
+			header.m_colorType == 2 || header.m_colorType == 6
+		);
 		assert(header.m_channelDepth == 8 || header.m_channelDepth == 16
 			&& "Color depth less than 8 not supported");
+		sta::expect<sta::NotImplemented>(
+			header.m_channelDepth == 8 || header.m_channelDepth == 16
+			);
 
 		// ANY*
 		auto chunkType = peekChunkType(a_inputStream);
@@ -825,7 +829,11 @@ namespace vob::img::png::detail
 
 		// IDAT+
 		auto const data = readData(header, a_inputStream, a_stackAllocator);
-		auto r_image = toImage<t_colorType, ChannelType>(header, data, a_imageAllocator);
+		auto r_image = toImage<t_colorType, ChannelType>(
+			header
+			, data
+			, a_imageAllocator
+		);
 
 		// ANY*
 		chunkType = peekChunkType(a_inputStream);

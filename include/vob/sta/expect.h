@@ -13,4 +13,8 @@ namespace vob::sta
 			throw exception;
 		}
 	}
+
+	struct NotImplemented
+		: std::exception
+	{};
 }

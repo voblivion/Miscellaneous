@@ -7,6 +7,10 @@
 
 namespace vob::img
 {
+	struct UnsupportedImageFormat
+		: std::exception
+	{};
+
 	template <
 		ColorType t_colorType = ColorType::RGB
 		, typename ChannelType = std::uint8_t
@@ -21,14 +25,14 @@ namespace vob::img
 		, StackAllocatorType const& a_stackAllocator = {}
 	)
 	{
-		return png::read<t_colorType, ChannelType>(
-			a_inputStream
-			, sta::ReboundAlloc<ImageAllocatorType, Pixel<t_colorType, ChannelType>>{
-				a_imageAllocator
-			}
-			, sta::ReboundAlloc<ImageAllocatorType, std::uint8_t>{
-				a_stackAllocator
-			}
-		);
+		if (png::canLoad(a_inputStream))
+		{
+			return png::read<t_colorType, ChannelType>(
+				a_inputStream
+				, a_imageAllocator
+				, a_stackAllocator
+			);
+		}
+		throw UnsupportedImageFormat{};
 	}
 }
