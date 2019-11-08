@@ -2,7 +2,7 @@
 
 #include <vob/sta/compiler.h>
 #include <vob/sta/fnv1a.h>
-#include <vob/sta/smallstring.h>
+#include <vob/sta/bounded_string.h>
 
 
 // If not specified, store string when NDEBUG is set
@@ -58,7 +58,7 @@ namespace vob::sta
 		// Attributes
 		std::uint64_t const m_id;
 #if VOB_STA_STRING_ID_STORE_STRING
-		SmallString<t_maxStringSize> m_string;
+		BoundedString<t_maxStringSize> m_string;
 #endif
 
 		// Constructors

@@ -100,7 +100,8 @@ namespace vob::sta
 	template <typename Type, typename AllocatorType, typename... Args>
 	PolymorphicPtr<Type> allocatePolymorphic(
 		AllocatorType const& a_allocator
-		, Args&&... a_args)
+		, Args&&... a_args
+	)
 	{
 		using Block = detail::PolymorphicBlock<Type, AllocatorType>;
 		using BlockAllocator = ReboundAlloc<AllocatorType, Block>;

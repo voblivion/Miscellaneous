@@ -5,13 +5,14 @@
 #include <exception>
 
 #include <vob/sta/compiler.h>
+#include <vob/sta/memory_resource.h>
 
 
-#ifndef VOB_STA_SMALL_STRING_DEBUG
+#ifndef VOB_STA_BOUNDED_STRING_DEBUG
 #ifdef NDEBUG
-#define VOB_STA_SMALL_STRING_DEBUG 0
+#define VOB_STA_BOUNDED_STRING_DEBUG 0
 #else
-#define VOB_STA_SMALL_STRING_DEBUG 1
+#define VOB_STA_BOUNDED_STRING_DEBUG 1
 #endif
 #endif
 
@@ -36,22 +37,22 @@ namespace vob::sta
 		std::size_t t_maxSize
 		, typename CharType = char
 	>
-	class SmallString
+	class BoundedString
 	{
 	public:
 		// Constructors
-		constexpr SmallString() noexcept = default;
-		explicit constexpr SmallString(SmallString const& a_other) noexcept
+		constexpr BoundedString() noexcept = default;
+		explicit constexpr BoundedString(BoundedString const& a_other) noexcept
 		{
 			setData(a_other);
 		};
 		template <typename StringType>
-		explicit constexpr SmallString(StringType const& a_string) noexcept
+		explicit constexpr BoundedString(StringType const& a_string) noexcept
 		{
 			setData(a_string);
 		}
 		template <typename StringType>
-		explicit constexpr SmallString(StringType const& a_string, Throw)
+		explicit constexpr BoundedString(StringType const& a_string, Throw)
 		{
 			setData(a_string, s_throw);
 		}
@@ -91,13 +92,13 @@ namespace vob::sta
 			return { data(), size() };
 		}
 
-		constexpr auto& operator=(SmallString const& a_other)
+		constexpr auto& operator=(BoundedString const& a_other)
 		{
 			setData(std::basic_string_view<CharType>{ a_other });
 			return *this;
 		}
 
-		constexpr auto& operator=(SmallString&& a_other)
+		constexpr auto& operator=(BoundedString&& a_other)
 		{
 			setData(a_other);
 			return *this;
@@ -107,7 +108,7 @@ namespace vob::sta
 		// Attributes
 		std::array<CharType, t_maxSize> m_data = {};
 		std::size_t m_size = 0;
-#if VOB_STA_SMALL_STRING_DEBUG == 1
+#if VOB_STA_BOUNDED_STRING_DEBUG == 1
 		CharType const* const m_debug = &m_data[0];
 #endif
 	};

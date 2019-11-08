@@ -5,7 +5,7 @@
 
 #include <vob/sta/expect.h>
 #include <vob/sta/integer.h>
-#include <vob/sta/streamreader.h>
+#include <vob/sta/stream_reader.h>
 
 
 namespace vob::sta

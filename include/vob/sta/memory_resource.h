@@ -16,10 +16,10 @@ namespace vob::sta
 			std::pmr::memory_resource* const a_resource
 				= std::pmr::get_default_resource()
 		) noexcept
-			: m_availableSpace{ bufferSize }
+			: m_availableSpace{ t_bufferSize }
 			, m_resource{ a_resource }
 		{
-			m_currentBuffer = m_buffer;
+			m_currentBuffer = m_buffer.data();
 		}
 
 		// Methods
@@ -62,9 +62,9 @@ namespace vob::sta
 
 	private:
 		// Attributes
-		std::size_t m_availableSpace;
 		alignas(alignof(std::max_align_t))
-			std::array<std::byte, t_bufferSize> m_buffer;
+		std::array<std::byte, t_bufferSize> m_buffer;
+		std::size_t m_availableSpace;
 		void* m_currentBuffer;
 		std::pmr::memory_resource* m_resource;
 	};

@@ -1,8 +1,9 @@
 #pragma once
 
 #include <vob/sta/integer.h>
-#include <vob/sta/streamreader.h>
+#include <vob/sta/stream_reader.h>
 #include <vob/sta/zinflate.h>
+
 
 namespace vob::sta
 {

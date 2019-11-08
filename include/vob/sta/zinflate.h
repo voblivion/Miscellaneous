@@ -8,7 +8,8 @@
 #include <vob/sta/expect.h>
 #include <vob/sta/huffman.h>
 #include <vob/sta/stream.h>
-#include <vob/sta/zinflatedecoders.h>
+#include <vob/sta/zinflate_decoders.h>
+
 
 namespace vob::sta
 {

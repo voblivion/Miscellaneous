@@ -2,6 +2,7 @@
 
 #include <vector>
 
+
 namespace vob::sta
 {
 
@@ -62,6 +63,6 @@ namespace vob::sta
 	{
 		template <typename KeyType, typename EqualType = std::equal_to<>>
 		using VectorSet = sta::VectorSet<KeyType, EqualType
-			, Allocator<KeyType>>;
+			, std::pmr::polymorphic_allocator<KeyType>>;
 	}
 }

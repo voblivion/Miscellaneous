@@ -7,8 +7,8 @@
 #include <vob/sta/allocator.h>
 #include <vob/sta/adam7.h>
 #include <vob/sta/expect.h>
-#include <vob/sta/streambuffer.h>
-#include <vob/sta/streamreader.h>
+#include <vob/sta/stream_buffer.h>
+#include <vob/sta/stream_reader.h>
 #include <vob/sta/zlib.h>
 
 #include <vob/img/image.h>
