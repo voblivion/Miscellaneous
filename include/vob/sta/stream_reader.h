@@ -1,94 +1,81 @@
 #pragma once
 
 #include <cassert>
-#include <exception>
 #include <iostream>
 
 #include <vob/sta/integer.h>
+#include <vob/sta/bounded_vector.h>
 
 
 namespace vob::sta
 {
-	struct UnexpectedEndOfFile final
-		: std::exception
-	{};
-
-	template <typename ValueType>
-	ValueType read(std::istream& a_inputStream)
+	template <typename T, typename InputStreamT>
+	bool raw_read(InputStreamT& a_input_stream, T& a_value)
 	{
-		ValueType t_value;
-		a_inputStream.read(
-			reinterpret_cast<char*>(&t_value)
-			, sizeof(ValueType)
-		);
-		return t_value;
+		using char_type = typename InputStreamT::char_type;
+		static_assert(sizeof(T) % sizeof(char_type) == 0, "Incompatible T and InputStream.");
+		
+		a_input_stream.read(reinterpret_cast<char_type*>(&a_value), sizeof(T) / sizeof(char_type));
+		return static_cast<bool>(a_input_stream);
 	}
 
-	class LowFirstBitStreamReader
+	class bit_stream_reader
 	{
 	public:
-		// Constructors
-		explicit LowFirstBitStreamReader(std::istream& a_inputStream)
-			: m_inputStream{ a_inputStream }
-		{}
-
-		// Methods
-		template <std::uint8_t t_maxBits>
-		auto get(std::uint8_t const a_bits = t_maxBits)
+#pragma region Methods
+		template <uint8_t MaxBits, typename InputStreamT, typename OutBufferT>
+		bool get(
+			InputStreamT& a_input_stream
+			, OutBufferT& a_value
+			, uint8_t const a_bits = MaxBits
+		)
 		{
-			fillBuffer(a_bits);
-			auto r_value = peekBuffer<t_maxBits>(a_bits);
-			ignoreBuffer(a_bits);
-			return r_value;
-		}
-
-		void ignoreCurrentByte()
-		{
-			assert(m_bufferBitSize < 8);
-			ignoreBuffer(m_bufferBitSize % 8);
-		}
-
-		bool eof() const
-		{
-			return m_bufferBitSize == 0 && m_inputStream.eof();
-		}
-
-	private:
-		// Attributes
-		std::istream& m_inputStream;
-		std::uint64_t m_buffer = 0;
-		std::uint8_t m_bufferBitSize = 0;
-		std::size_t m_dummy = 0;
-
-		// Methods
-		void fillBuffer(std::uint8_t const a_bits)
-		{
-			// TODO: assert(a_bits < sizeof(m_buffer) * 8 - 7)
-			while (m_bufferBitSize < a_bits)
+			using char_type = typename InputStreamT::char_type;
+			static_assert(MaxBits < (sizeof(m_buffer) - sizeof(char_type)) * 8 + 1);
+			if (fill_buffer(a_input_stream, a_bits))
 			{
-				if (m_inputStream.eof())
-				{
-					assert(false);
-				}
-				auto const byte = m_inputStream.get();
-				++m_dummy;
-				m_buffer |= byte << m_bufferBitSize;
-				m_bufferBitSize += 8;
+				auto const mask = (1 << a_bits) - 1;
+				a_value = static_cast<OutBufferT>(m_buffer & mask);
+				ignore_buffer(a_bits);
+				return true;
 			}
+			return false;
 		}
 
-		template <std::uint8_t t_maxBits>
-		auto peekBuffer(std::uint8_t const a_bits = t_maxBits) const
+		void ignore_current_byte()
 		{
-			auto const mask = (1 << a_bits) - 1;
-			return static_cast<SmallestUInt<t_maxBits>>(m_buffer & mask);
+			assert(m_buffer_bits < 8);
+			ignore_buffer(m_buffer_bits);
+		}
+#pragma endregion
+	private:
+#pragma region Attributes
+		std::uint64_t m_buffer = 0;
+		std::uint8_t m_buffer_bits = 0;
+		std::size_t m_dummy = 0;
+#pragma endregion
+#pragma region Methods
+		template <typename InputStreamT>
+		bool fill_buffer(InputStreamT& a_input_stream, uint8_t const a_bits)
+		{
+			using char_type = typename InputStreamT::char_type;
+			assert(a_bits < (sizeof(m_buffer) - sizeof(char_type)) * 8 + 1);
+			char_type byte;
+			while (m_buffer_bits < a_bits && a_input_stream.get(byte))
+			{
+				++m_dummy;
+				m_buffer |= byte << m_buffer_bits;
+				m_buffer_bits += sizeof(char_type) * 8;
+			}
+			return m_buffer_bits >= a_bits;
 		}
 
-		void ignoreBuffer(std::uint8_t const a_bits)
+		void ignore_buffer(uint8_t const a_bits)
 		{
-			// assert(a_bits)
+			assert(a_bits <= m_buffer_bits);
 			m_buffer >>= a_bits;
-			m_bufferBitSize -= a_bits;
+			m_buffer_bits -= a_bits;
 		}
+#pragma endregion
 	};
 }

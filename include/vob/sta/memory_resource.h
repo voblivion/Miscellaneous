@@ -6,170 +6,169 @@
 
 namespace vob::sta
 {
-	template <std::size_t t_bufferSize>
-	class BufferResource final
-		: public std::pmr::memory_resource
+	using namespace std;
+
+	template <size_t BufferSize>
+	class buffer_resource final
+		: public pmr::memory_resource
 	{
 	public:
-		// Constructors
-		explicit BufferResource(
-			std::pmr::memory_resource* const a_resource
-				= std::pmr::get_default_resource()
+#pragma region Constructors
+		explicit buffer_resource(
+			memory_resource* const a_resource = pmr::get_default_resource()
 		) noexcept
-			: m_availableSpace{ t_bufferSize }
+			: m_available_space{ BufferSize }
 			, m_resource{ a_resource }
 		{
-			m_currentBuffer = m_buffer.data();
+			m_current_buffer = m_buffer.data();
 		}
 
-		// Methods
-		std::pmr::memory_resource* upstreamResource() const noexcept
+		buffer_resource(buffer_resource&&) = delete;
+		buffer_resource(buffer_resource const&) = delete;
+
+		~buffer_resource() = default;
+#pragma endregion
+#pragma region Methods
+		auto upstream_resource() const noexcept
 		{
 			return m_resource;
 		}
-
+#pragma endregion
+#pragma region Operators
+		buffer_resource& operator=(buffer_resource&&) = delete;
+		buffer_resource& operator=(buffer_resource const&) = delete;
+#pragma endregion
 	protected:
-		// Methods
-		virtual void* do_allocate(std::size_t a_bytes
-			, std::size_t a_alignment) override
+#pragma region Methods
+		void* do_allocate(size_t a_bytes, size_t a_alignment) override
 		{
-			if (auto const ptr = std::align(
-				a_alignment, a_bytes, m_currentBuffer, m_availableSpace
-			))
+			auto const ptr = align(a_alignment, a_bytes, m_current_buffer, m_available_space);
+			if (ptr != nullptr)
 			{
-				m_currentBuffer = static_cast<std::byte*>(ptr) + a_bytes;
-				m_availableSpace -= a_bytes;
+				m_current_buffer = static_cast<byte*>(ptr) + a_bytes;
+				m_available_space -= a_bytes;
 				return ptr;
 			}
 
 			return m_resource->allocate(a_bytes, a_alignment);
 		}
 
-		virtual void do_deallocate(void* a_ptr, std::size_t a_bytes
-			, std::size_t a_alignment) override
+		void do_deallocate(void* a_ptr, size_t a_bytes, size_t a_alignment) override
 		{
-			if (a_ptr < m_buffer.data() || m_currentBuffer <= a_ptr)
+			if (a_ptr < m_buffer.data() || m_current_buffer <= a_ptr)
 			{
 				m_resource->deallocate(a_ptr, a_bytes, a_alignment);
 			}
 		}
 
-		virtual bool do_is_equal(
-			const std::pmr::memory_resource& a_resource) const noexcept override
+		bool do_is_equal(const memory_resource& a_resource) const noexcept override
 		{
 			return &a_resource == this;
 		}
-
+#pragma endregion
 	private:
-		// Attributes
-		alignas(alignof(std::max_align_t))
-		std::array<std::byte, t_bufferSize> m_buffer;
-		std::size_t m_availableSpace;
-		void* m_currentBuffer;
-		std::pmr::memory_resource* m_resource;
+#pragma region Attributes
+		alignas(alignof(max_align_t)) array<byte, BufferSize> m_buffer;
+		size_t m_available_space;
+		void* m_current_buffer;
+		memory_resource* m_resource;
+#pragma endregion
 	};
 
-	class DynamicBufferResource final
-		: public std::pmr::memory_resource
+	class dynamic_buffer_resource final
+		: public pmr::memory_resource
 	{
 	public:
-		// Constructors
-		explicit DynamicBufferResource(
-			std::size_t const a_bufferSize,
-			std::pmr::memory_resource* const a_resource
-				= std::pmr::get_default_resource()
+#pragma region Constructors
+		explicit dynamic_buffer_resource(
+			size_t const a_bufferSize,
+			memory_resource* const a_resource = pmr::get_default_resource()
 		) noexcept
-			: m_bufferSize{ a_bufferSize }
-			, m_availableSpace{ a_bufferSize }
+			: m_buffer_size{ a_bufferSize }
+			, m_available_space{ a_bufferSize }
 			, m_resource{ a_resource }
 		{}
 
-		DynamicBufferResource(DynamicBufferResource&& a_resource) noexcept
-			: m_bufferSize{ a_resource.m_bufferSize }
-			, m_availableSpace{ a_resource.m_availableSpace }
+		dynamic_buffer_resource(dynamic_buffer_resource&& a_resource) noexcept
+			: m_buffer_size{ a_resource.m_buffer_size }
+			, m_available_space{ a_resource.m_available_space }
 			, m_buffer{ a_resource.m_buffer }
-			, m_currentBuffer{ a_resource.m_currentBuffer }
+			, m_current_buffer{ a_resource.m_current_buffer }
 			, m_resource{ a_resource.m_resource }
 		{
 			a_resource.m_buffer = nullptr;
 		}
 
-		DynamicBufferResource(DynamicBufferResource const&) = delete;
+		dynamic_buffer_resource(dynamic_buffer_resource const&) = delete;
 
-		~DynamicBufferResource()
+		~dynamic_buffer_resource()
 		{
 			if (m_buffer != nullptr)
 			{
-				m_resource->deallocate(m_buffer, m_bufferSize
-					, alignof(std::max_align_t));
+				m_resource->deallocate(m_buffer, m_buffer_size, alignof(max_align_t));
 			}
 		}
-
-		// Methods
-		std::pmr::memory_resource* upstreamResource() const
+#pragma endregion
+#pragma region Methods
+		auto upstream_resource() const
 		{
 			return m_resource;
 		}
-
-		// Operators
-		DynamicBufferResource& operator=(
-			DynamicBufferResource&& a_resource) noexcept
+#pragma endregion
+#pragma region Operators
+		dynamic_buffer_resource& operator=(dynamic_buffer_resource&& a_resource) noexcept
 		{
-			m_bufferSize = a_resource.m_bufferSize;
-			m_availableSpace = a_resource.m_availableSpace;
+			m_buffer_size = a_resource.m_buffer_size;
+			m_available_space = a_resource.m_available_space;
 			m_buffer = a_resource.m_buffer;
 			a_resource.m_buffer = nullptr;
-			m_currentBuffer = a_resource.m_currentBuffer;
+			m_current_buffer = a_resource.m_current_buffer;
 			m_resource = a_resource.m_resource;
 			return *this;
 		}
-		DynamicBufferResource& operator=(
-			DynamicBufferResource const&) = delete;
 
+		dynamic_buffer_resource& operator=(dynamic_buffer_resource const&) = delete;
+#pragma endregion
 	protected:
-		// Methods
-		virtual void* do_allocate(std::size_t a_bytes
-			, std::size_t a_alignment) override
+#pragma region Methods
+		void* do_allocate(size_t a_bytes, size_t a_alignment) override
 		{
 			if (m_buffer == nullptr)
 			{
-				m_buffer = m_resource->allocate(m_bufferSize
-					, alignof(std::max_align_t));
-				m_currentBuffer = m_buffer;
+				m_buffer = m_resource->allocate(m_buffer_size, alignof(max_align_t));
+				m_current_buffer = m_buffer;
 			}
 
-			if (auto const ptr = std::align(a_alignment, a_bytes
-				, m_currentBuffer, m_availableSpace))
+			if (auto const ptr = align(a_alignment, a_bytes, m_current_buffer, m_available_space))
 			{
-				m_currentBuffer = static_cast<std::byte*>(ptr) + a_bytes;
-				m_availableSpace -= a_bytes;
+				m_current_buffer = static_cast<byte*>(ptr) + a_bytes;
+				m_available_space -= a_bytes;
 				return ptr;
 			}
 
 			return m_resource->allocate(a_bytes, a_alignment);
 		}
 
-		virtual void do_deallocate(void* a_ptr, std::size_t a_bytes
-			, std::size_t a_alignment) override
+		void do_deallocate(void* a_ptr, size_t a_bytes, size_t a_alignment) override
 		{
-			if (a_ptr < m_buffer || m_currentBuffer <= a_ptr)
+			if (a_ptr < m_buffer || m_current_buffer <= a_ptr)
 			{
 				m_resource->deallocate(a_ptr, a_bytes, a_alignment);
 			}
 		}
 
-		virtual bool do_is_equal(
-			const std::pmr::memory_resource& a_resource) const noexcept override
+		bool do_is_equal(const memory_resource& a_resource) const noexcept override
 		{
 			return &a_resource == this;
 		}
-
+#pragma endregion
 	private:
-		// Attributes
-		std::size_t m_bufferSize;
-		std::size_t m_availableSpace;
+#pragma region Attributes
+		size_t m_buffer_size;
+		size_t m_available_space;
 		void* m_buffer = nullptr;
-		void* m_currentBuffer = nullptr;
-		std::pmr::memory_resource* m_resource;
+		void* m_current_buffer = nullptr;
+		memory_resource* m_resource;
+#pragma endregion
 	};
 }

@@ -1,51 +1,57 @@
 #pragma once
 
+#include <utility>
+
+
 namespace vob::sta
 {
-	template <typename BaseType>
-	class NoCopy
-		: public BaseType
+	using namespace std;
+
+	template <typename Type>
+	class no_copy
+		: public Type
 	{
 	public:
-		// (Con|De)structors
-		NoCopy(NoCopy const& a_other) {}
+#pragma region Constructors
+		no_copy(no_copy const& a_other) {}
 
-		NoCopy(NoCopy&& a_other) noexcept
-			: BaseType{ std::move(a_other) }
+		no_copy(no_copy&& a_other) noexcept
+			: Type{ move(a_other) }
 		{}
 
-		explicit NoCopy()
-			: BaseType{}
+		explicit no_copy()
+			: Type{}
 		{}
 
 		/*template <typename... Args>
 		explicit NoCopy(Args&&... a_args)
-			: BaseType{ std::forward<Args>(a_args)... }
+			: Type{ std::forward<Args>(a_args)... }
 		{}*/
 
-		~NoCopy() = default;
-
-		// Operators
-		NoCopy& operator=(BaseType const& a_other)
+		~no_copy() = default;
+#pragma endregion
+#pragma region Operators
+		no_copy& operator=(Type const& a_other)
 		{
 			return *this;
 		}
 
-		NoCopy& operator=(BaseType&& a_other)
+		no_copy& operator=(Type&& a_other)
 		{
-			BaseType::operator=(std::move(a_other));
+			Type::operator=(std::move(a_other));
 			return *this;
 		}
 
-		NoCopy& operator=(NoCopy const& a_other)
+		no_copy& operator=(no_copy const& a_other)
 		{
 			return *this;
 		}
 
-		NoCopy& operator=(NoCopy&& a_other) noexcept
+		no_copy& operator=(no_copy&& a_other) noexcept
 		{
-			BaseType::operator=(std::move(a_other));
+			Type::operator=(std::move(a_other));
 			return *this;
 		}
+#pragma endregion
 	};
 }

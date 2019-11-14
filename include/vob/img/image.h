@@ -1,79 +1,80 @@
 #pragma once
 
-#include <cinttypes>
 #include <vector>
-#include <optional>
+
 
 namespace vob::img
 {
-	enum class ColorType
+	enum class color_type : std::uint8_t
 	{
-		GreyScale = 1
-		, GreyScaleAlpha = 2
-		, RGB = 3
-		, RGBA = 4
+		grey_scale
+		, grey_scale_alpha
+		, rgb
+		, rgb_alpha
 	};
 
-	template <ColorType t_colorType>
-	constexpr std::uint8_t s_channelCount =
-		static_cast<std::underlying_type_t<ColorType>>(t_colorType);
+	template <color_type ColorType>
+	constexpr auto channel_count = static_cast<std::underlying_type_t<color_type>>(ColorType);
 
-	template <ColorType t_colorType, typename ChannelType>
-	struct Pixel;
+	template <color_type ColorType, typename ChannelType>
+	struct pixel;
 
-	template <typename ChannelType>
-	struct Pixel<ColorType::GreyScale, ChannelType>
+	template <typename ChannelT>
+	struct pixel<color_type::grey_scale, ChannelT>
 	{
-		ChannelType i;
+		using channel_type = ChannelT;
+		channel_type i;
 	};
 
-	template <typename ChannelType>
-	struct Pixel<ColorType::GreyScaleAlpha, ChannelType>
+	template <typename ChannelT>
+	struct pixel<color_type::grey_scale_alpha, ChannelT>
 	{
-		ChannelType i;
-		ChannelType a;
+		using channel_type = ChannelT;
+		channel_type i;
+		channel_type a;
 	};
 
-	template <typename ChannelType>
-	struct Pixel<ColorType::RGB, ChannelType>
+	template <typename ChannelT>
+	struct pixel<color_type::rgb, ChannelT>
 	{
-		ChannelType r;
-		ChannelType g;
-		ChannelType b;
+		using channel_type = ChannelT;
+		channel_type r;
+		channel_type g;
+		channel_type b;
 	};
 
-	template <typename ChannelType>
-	struct Pixel<ColorType::RGBA, ChannelType>
+	template <typename ChannelT>
+	struct pixel<color_type::rgb_alpha, ChannelT>
 	{
-		ChannelType r;
-		ChannelType g;
-		ChannelType b;
-		ChannelType a;
+		using channel_type = ChannelT;
+		channel_type r;
+		channel_type g;
+		channel_type b;
+		channel_type a;
 	};
 
 	template <
-		ColorType t_colorType
-		, typename ChannelType
-		, typename AllocatorType = std::pmr::polymorphic_allocator<ChannelType>
+		color_type ColorType
+		, typename ChannelT
+		, typename AllocatorT = std::pmr::polymorphic_allocator<ChannelT>
 	>
-	struct Image
+	struct image
 	{
-		// Aliases
-		using PixelType = Pixel<t_colorType, ChannelType>;
-
-		// Constructors
-		Image(
-			std::size_t const a_height
-			, std::size_t const a_width
-			, AllocatorType const& a_allocator
-		)
+#pragma region Aliases
+		using channel_type = ChannelT;
+		static constexpr auto color_type = ColorType;
+		using pixel_type = pixel<ColorType, channel_type>;
+#pragma endregion
+#pragma region Constructors
+		image(std::size_t const a_height, std::size_t const a_width, AllocatorT const& a_allocator)
 			: m_width{ a_width }
 			, m_height{ a_height }
 			, m_pixels{ a_allocator }
 		{
 			m_pixels.resize(a_height * a_width);
 		}
-
+#pragma endregion
+#pragma region Methods
 		auto& at(std::size_t const a_line, std::size_t const a_column) const
 		{
 			return m_pixels[a_line * m_width + a_column];
@@ -83,12 +84,13 @@ namespace vob::img
 		{
 			return m_pixels[a_line * m_width + a_column];
 		}
-
+#pragma endregion
 	private:
-		// Attributes
+#pragma region Attributes
 		std::size_t m_width;
 		std::size_t m_height;
-		std::vector<PixelType, AllocatorType> m_pixels;
+		std::vector<pixel_type, AllocatorT> m_pixels;
+#pragma endregion
 	};
 
 }

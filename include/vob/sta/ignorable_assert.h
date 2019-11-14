@@ -2,4 +2,4 @@
 
 #include <vob/sta/debug_break.h>
 
-#define ignorableAssert(cond) if (!(cond)) debugBreak();
+#define ignorable_assert(cond) if (!(cond)) debug_break();

@@ -27,7 +27,7 @@
 
 #ifdef _MSC_VER
 
-#define debugBreak __debugbreak
+#define debug_break __debugbreak
 
 #else
 
@@ -126,20 +126,20 @@ extern "C" {
 #error "debugbreak.h is not supported on this target"
 #elif DEBUG_BREAK_IMPL == DEBUG_BREAK_USE_TRAP_INSTRUCTION
 	__attribute__((gnu_inline, always_inline))
-		__inline__ static void debugBreak(void)
+		__inline__ static void debug_break(void)
 	{
 		trap_instruction();
 	}
 #elif DEBUG_BREAK_IMPL == DEBUG_BREAK_USE_BULTIN_TRAP
 	__attribute__((gnu_inline, always_inline))
-		__inline__ static void debugBreak(void)
+		__inline__ static void debug_break(void)
 	{
 		__builtin_trap();
 	}
 #elif DEBUG_BREAK_IMPL == DEBUG_BREAK_USE_SIGTRAP
 #include <signal.h>
 	__attribute__((gnu_inline, always_inline))
-		__inline__ static void debugBreak(void)
+		__inline__ static void debug_break(void)
 	{
 		raise(SIGTRAP);
 	}
@@ -151,4 +151,4 @@ extern "C" {
 }
 #endif
 
-#endif /* ifdef _MSC_VER */
+#endif

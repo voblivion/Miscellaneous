@@ -1,11 +1,9 @@
 #pragma once
 
-#include <vob/sta/compiler.h>
 #include <vob/sta/fnv1a.h>
 #include <vob/sta/bounded_string.h>
 
 
-// If not specified, store string when NDEBUG is set
 #ifndef VOB_STA_STRING_ID_STORE_STRING
 #ifdef NDEBUG
 #define VOB_STA_STRING_ID_STORE_STRING 0
@@ -22,22 +20,24 @@
 
 namespace vob::sta
 {
-	template <std::size_t t_maxStringSize>
-	class StringId
+	using namespace std;
+
+	template <size_t MaxStringSize>
+	class string_id
 	{
 	public:
 		// Constructors
-		constexpr StringId(std::uint64_t const a_id)
+		constexpr string_id(uint64_t const a_id)
 #if VOB_STA_STRING_ID_STORE_STRING
-			: StringId{ a_id, VOB_STA_STRING_ID_UNKNOWN }
+			: string_id{ a_id, VOB_STA_STRING_ID_UNKNOWN }
 #else
 			: m_id{ a_id }
 #endif
 		{}
 
 		template <typename StringType>
-		constexpr StringId(StringType const& a_string)
-			: StringId{ fnv1a(a_string), a_string }
+		constexpr string_id(StringType const& a_string)
+			: string_id{ fnv1a(a_string), a_string }
 		{}
 
 		// Methods
@@ -58,23 +58,23 @@ namespace vob::sta
 		// Attributes
 		std::uint64_t const m_id;
 #if VOB_STA_STRING_ID_STORE_STRING
-		BoundedString<t_maxStringSize> m_string;
+		bounded_string<MaxStringSize> m_string;
 #endif
 
 		// Constructors
 		template <typename StringType>
-		constexpr StringId(std::uint64_t const a_id, StringType const& a_string)
+		constexpr string_id(std::uint64_t const a_id, StringType const& a_string)
 			: m_id{ a_id }
 		{
 #if VOB_STA_STRING_ID_STORE_STRING
-			m_string.setData(a_string);
+			m_string.assign(a_string);
 #endif
 		}
 	};
 
 	namespace literals
 	{
-		constexpr StringId<16> operator ""_id(
+		constexpr string_id<16> operator ""_id(
 			char const* const a_str
 			, std::size_t const a_size
 		)

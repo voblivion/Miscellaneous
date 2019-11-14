@@ -2,340 +2,324 @@
 
 #include <array>
 #include <cassert>
+#include <functional>
 #include <vector>
 
-#include <vob/sta/allocator.h>
-#include <vob/sta/adam7.h>
-#include <vob/sta/expect.h>
-#include <vob/sta/stream_buffer.h>
+#include <vob/sta/algorithm.h>
+#include <vob/img/adam7.h>
+#include <vob/sta/vector_streambuf.h>
 #include <vob/sta/stream_reader.h>
-#include <vob/sta/zlib.h>
+#include <vob/zlib/zlib.h>
 
 #include <vob/img/image.h>
+#include <vob/img/error.h>
+#include "vob/sta/enum.h"
 
 namespace vob::img::png
 {
-	inline bool canLoad(std::istream& a_inputStream)
+	inline bool can_load(std::istream& a_input_stream)
 	{
 		std::array<char, 8> header{};
-		a_inputStream.read(&header[0], header.size());
-		a_inputStream.seekg(-8, std::ios_base::cur);
+		auto const pos = a_input_stream.tellg();
+		a_input_stream.get(&header[0], header.size());
+		a_input_stream.seekg(pos);
 
 		return header[0] == '\x89' && header[1] == 'P' && header[2] == 'N'
 			&& header[3] == 'G' && header[4] == '\r' && header[5] == '\n'
 			&& header[6] == '\x1a' && header[7] == '\n';
 	}
-
-	struct InvalidPngStream final
-		: std::exception
-	{};
-
-	struct MustStartByIhdrChunk final
-		: std::exception
-	{};
-
-	struct InvalidColorType final
-		: std::exception
-	{
-		explicit InvalidColorType(std::uint8_t const a_colorType)
-			: m_colorType{ a_colorType }
-		{}
-
-		std::uint8_t m_colorType;
-	};
-
-	struct InvalidChannelDepth final
-		: std::exception
-	{
-		explicit InvalidChannelDepth(std::uint8_t const a_channelDepth)
-			: m_channelDepth{ a_channelDepth }
-		{}
-
-		std::uint8_t m_channelDepth;
-	};
-
-	struct IncompatibleColorTypeAndChannelDepth final
-		: std::exception
-	{
-		explicit IncompatibleColorTypeAndChannelDepth(
-			std::uint8_t const a_channelDepth
-			, std::uint8_t const a_colorType
-		)
-			: m_channelDepth{ a_channelDepth }
-			, m_colorType{ a_colorType }
-		{}
-
-		std::uint8_t m_channelDepth;
-		std::uint8_t m_colorType;
-	};
-
-	struct ZlibDictNotAllowed final
-		: std::exception
-	{};
-
-	struct InvalidZlibCompressionMethod final
-		: std::exception
-	{};
 }
 
 namespace vob::img::png::detail
 {
-	enum class ColorType : std::uint8_t
+	enum class color_type : std::uint8_t
 	{
-		GrayScale = 0
-		, RGB = 2
-		, Palette = 3
-		, GrayScaleAlpha = 4
-		, RGBA = 6
+		gray_scale = 0
+		, rgb = 2
+		, palette = 3
+		, gray_scale_alpha = 4
+		, rgb_alpha = 6
+	};
+}
+
+VOB_STA_DECLARE_ENUM_REFLECTED_UNSIGNED(vob::img::png::detail::color_type, 7);
+
+namespace vob::img::png::detail
+{
+	using color_type_traits = sta::enum_traits<color_type>;
+	constexpr auto color_type_count = color_type_traits::values.size();
+
+	constexpr std::array<std::uint8_t, color_type_count> channel_count = {
+		1, 3, 0, 2, 4
 	};
 
-	constexpr static std::array<std::uint8_t, 7> s_channelCount = {
-		1, 0, 3, 0, 2, 0, 4
-	};
-
-	struct ChunkHeader
+	constexpr bool is_valid_channel_depth(std::uint8_t const a_channel_depth)
 	{
-		std::uint32_t m_length;
-		std::uint32_t m_type;
-	};
+		constexpr std::array<std::uint8_t, 5> valid_channel_depths = { 1, 2, 4, 8, 16 };
 
-	inline ChunkHeader readChunkHeader(std::istream& a_inputStream)
-	{
-		return {
-			sta::endian(sta::read<std::uint32_t>(a_inputStream))
-			, sta::endian(sta::read<std::uint32_t>(a_inputStream))
-		};
-	}
-
-	inline std::uint32_t peekChunkType(std::istream& a_inputStream)
-	{
-		auto const chunkHeader = readChunkHeader(a_inputStream);
-		a_inputStream.seekg(-8, std::ios_base::cur);
-		return chunkHeader.m_type;
-	}
-
-	struct ChunkFooter
-	{
-		std::uint32_t m_crc;
-	};
-
-	inline ChunkFooter readChunkFooter(std::istream& a_inputStream)
-	{
-		return { sta::endian(sta::read<std::uint32_t>(a_inputStream)) };
-	}
-
-	inline void ignoreChunk(std::istream& a_inputStream)
-	{
-		auto const chunkHeader = readChunkHeader(a_inputStream);
-
-		a_inputStream.ignore(chunkHeader.m_length);
-
-		readChunkFooter(a_inputStream);
-	}
-
-	struct Header
-	{
-		std::uint32_t m_width;
-		std::uint32_t m_height;
-		std::uint8_t m_channelDepth;
-		std::uint8_t m_colorType;
-		std::uint8_t m_compressionMethod;
-		std::uint8_t m_filterMethod;
-		std::uint8_t m_interlaceMethod;
-	};
-
-	inline Header readHeaderChunk(std::istream& a_inputStream)
-	{
-		readChunkHeader(a_inputStream);
-
-		Header const r_header{
-			sta::endian(sta::read<std::uint32_t>(a_inputStream))
-			, sta::endian(sta::read<std::uint32_t>(a_inputStream))
-			, sta::endian(sta::read<std::uint8_t>(a_inputStream))
-			, sta::endian(sta::read<std::uint8_t>(a_inputStream))
-			, sta::endian(sta::read<std::uint8_t>(a_inputStream))
-			, sta::endian(sta::read<std::uint8_t>(a_inputStream))
-			, sta::endian(sta::read<std::uint8_t>(a_inputStream))
-		};
-
-		sta::expect(
-			r_header.m_channelDepth == 1
-			|| r_header.m_channelDepth == 2
-			|| r_header.m_channelDepth == 4
-			|| r_header.m_channelDepth == 8
-			|| r_header.m_channelDepth == 16
-			, InvalidChannelDepth{ r_header.m_channelDepth }
+		return sta::fix_c20_any_of(
+			valid_channel_depths.begin()
+			, valid_channel_depths.end()
+			, [&a_channel_depth](auto const a_valid_cd) { return a_valid_cd == a_channel_depth; }
 		);
-
-		sta::expect(
-			r_header.m_colorType < 7
-			&& r_header.m_colorType != 1
-			&& r_header.m_colorType != 5
-			, InvalidColorType{ r_header.m_colorType }
-		);
-
-		sta::expect(
-			(r_header.m_channelDepth < 8
-				&& (r_header.m_colorType == 0 || r_header.m_colorType == 3))
-			|| r_header.m_channelDepth == 8
-			|| r_header.m_colorType != 3
-			, IncompatibleColorTypeAndChannelDepth{
-				r_header.m_channelDepth, r_header.m_colorType
-			}
-		);
-
-		readChunkFooter(a_inputStream);
-
-		return r_header;
 	}
 
-	/*struct PaletteColor
-	{
-		std::uint8_t r;
-		std::uint8_t g;
-		std::uint8_t b;
-	};
-
-	struct Palette
-	{
-		std::vector<PaletteColor> m_colors;
-	};
-
-	inline Palette readPalette(std::istream& a_inputStream)
-	{
-		auto const chunkHeader = readChunkHeader(a_inputStream);
-
-		Palette r_palette;
-		r_palette.m_colors.resize(chunkHeader.m_length / 3);
-		a_inputStream.read(
-			reinterpret_cast<char*>(&r_palette.m_colors[0])
-			, chunkHeader.m_length
-		);
-
-		auto const chunkFooter = readChunkFooter(a_inputStream);
-
-		return r_palette;
-	}*/
-
-	inline void readDataChunk(
-		std::istream& a_inputStream
-		, std::basic_ostream<std::uint8_t>& a_outputStream
+	constexpr bool is_valid_color_type_channel_depth_pair(
+		color_type const a_color_type
+		, std::uint8_t const a_valid_channel_depth
 	)
 	{
-		readChunkHeader(a_inputStream);
-
-		auto const zlibHeader = sta::peekZlibHeader(a_inputStream);
-		if (zlibHeader.m_dict != 0)
+		assert(sta::enum_value_is_valid(a_color_type));
+		assert(is_valid_channel_depth(a_valid_channel_depth));
+		if (a_color_type == color_type::palette)
 		{
-			throw ZlibDictNotAllowed{};
+			return a_valid_channel_depth <= 8;
 		}
-		if (zlibHeader.m_method != 8)
+		if(a_color_type == color_type::gray_scale)
 		{
-			throw InvalidZlibCompressionMethod{};
+			return true;
 		}
-		sta::readZlib(a_inputStream, a_outputStream);
-
-		readChunkFooter(a_inputStream);
-
+		return a_valid_channel_depth >= 8;
 	}
 
-	enum class FilterType
+	struct chunk_header
 	{
-		None
-		, Sub
-		, Up
-		, Average
-		, Paeth
+		std::uint32_t length;
+		std::uint32_t type;
 	};
 
-	template <FilterType t_filterType, typename AllocatorType>
-	struct UnfilterFunction;
+	inline chunk_header read_chunk_header(std::istream& a_input_stream)
+	{
+		chunk_header header{};
+		img::detail::expect(
+			sta::raw_read(a_input_stream, header.length)
+			, "not enough bytes to read png chunk length"
+		);
+		header.length = sta::endian(header.length);
 
-	template <typename AllocatorType>
-	struct UnfilterFunction<FilterType::None, AllocatorType>
+		img::detail::expect(
+			sta::raw_read(a_input_stream, header.type)
+			, "not enough bytes to read png chunk type"
+		);
+		header.type = sta::endian(header.type);
+
+		return header;
+	}
+
+	inline std::uint32_t peek_chunk_type(std::istream& a_input_stream)
+	{
+		auto const pos = a_input_stream.tellg();
+		auto const png_chunk_header = read_chunk_header(a_input_stream);
+		a_input_stream.seekg(pos);
+		return png_chunk_header.type;
+	}
+
+	struct chunk_footer
+	{
+		std::uint32_t crc;
+	};
+
+	inline chunk_footer read_chunk_footer(std::istream& a_input_stream)
+	{
+		chunk_footer footer{};
+		img::detail::expect(
+			sta::raw_read(a_input_stream, footer.crc)
+			, "not enough bytes to read png chunk crc"
+		);
+		footer.crc = sta::endian(footer.crc);
+
+		return footer;
+	}
+
+	inline void ignore_chunk(std::istream& a_input_stream)
+	{
+		auto const header = read_chunk_header(a_input_stream);
+
+		a_input_stream.ignore(header.length);
+
+		read_chunk_footer(a_input_stream);
+	}
+
+	struct header_chunk
+	{
+		std::uint32_t width;
+		std::uint32_t height;
+		std::uint8_t channel_depth;
+		std::uint8_t color_type;
+		std::uint8_t compression_method;
+		std::uint8_t filter_method;
+		std::uint8_t interlace_method;
+	};
+
+	inline header_chunk read_header_chunk(std::istream& a_input_stream)
+	{
+		read_header_chunk(a_input_stream);
+
+		header_chunk const chunk{};
+		img::detail::expect(
+			sta::raw_read(a_input_stream, chunk.width)
+			, "not enough bytes to read header chunk width"
+		);
+		img::detail::expect(
+			sta::raw_read(a_input_stream, chunk.height)
+			, "not enough bytes to read header chunk height"
+		);
+		img::detail::expect(
+			sta::raw_read(a_input_stream, chunk.channel_depth)
+			, "not enough bytes to read header chunk channel depth"
+		);
+		img::detail::expect(
+			is_valid_channel_depth(chunk.channel_depth)
+			, "invalid png channel depth"
+		);
+		img::detail::expect(
+			sta::raw_read(a_input_stream, chunk.color_type)
+			, "not enough bytes to read header chunk color type"
+		);
+		img::detail::expect(
+			sta::enum_integer_is_valid<color_type>(chunk.color_type)
+			, "invalid png color type"
+		);
+		img::detail::expect(
+			is_valid_color_type_channel_depth_pair(
+				static_cast<color_type>(chunk.color_type)
+				, chunk.channel_depth
+			)
+			, "incompatible png channel depth and color type"
+		);
+		img::detail::expect(
+			sta::raw_read(a_input_stream, chunk.compression_method)
+			, "not enough bytes to read header chunk compression method"
+		);
+		img::detail::expect(
+			sta::raw_read(a_input_stream, chunk.filter_method)
+			, "not enough bytes to read header chunk filter method"
+		);
+		img::detail::expect(
+			sta::raw_read(a_input_stream, chunk.interlace_method)
+			, "not enough bytes to read header chunk interlace method"
+		);
+
+		read_chunk_footer(a_input_stream);
+		// TODO : validate crc
+
+		return chunk;
+	}
+
+	inline void read_data_chunk(
+		std::istream& a_input_stream
+		, std::ostream& a_output_stream
+	)
+	{
+		read_chunk_header(a_input_stream);
+
+		auto const zlib_header = zlib::peek_header(a_input_stream);
+		img::detail::expect(zlib_header.dict == 0, "zlib data for png can't use dictionary");
+		img::detail::expect(zlib_header.method == 8, "zlib compression method for png must be 8");
+
+		zlib::inflate(a_input_stream, a_output_stream);
+
+		read_chunk_footer(a_input_stream);
+		// TODO : validate crc
+	}
+
+	enum class filter_type
+	{
+		none
+		, sub
+		, up
+		, average
+		, paeth
+	};
+
+	template <filter_type FilterType, typename AllocatorT>
+	struct unfilter_function;
+
+	template <typename AllocatorT>
+	struct unfilter_function<filter_type::none, AllocatorT>
 	{
 		std::uint8_t operator()(
-			std::vector<std::uint8_t, AllocatorType> const& a_data
+			std::vector<std::uint8_t, AllocatorT> const& a_data
 			, std::size_t const a_width
-			, std::size_t const a_dataSize
+			, std::size_t const a_data_size
 			, std::size_t const a_line
 			, std::size_t const a_column
-			, std::size_t const a_dataOffset
-			) const
+			, std::size_t const a_data_offset
+		) const
 		{
 			return 0;
 		}
 	};
 
-	template <typename AllocatorType>
-	struct UnfilterFunction<FilterType::Sub, AllocatorType>
+	template <typename AllocatorT>
+	struct unfilter_function<filter_type::sub, AllocatorT>
 	{
 		std::uint8_t operator()(
-			std::vector<std::uint8_t, AllocatorType> const& a_data
+			std::vector<std::uint8_t, AllocatorT> const& a_data
 			, std::size_t const a_width
-			, std::size_t const a_dataSize
+			, std::size_t const a_data_size
 			, std::size_t const a_line
 			, std::size_t const a_column
-			, std::size_t const a_dataOffset
-			) const
+			, std::size_t const a_data_offset
+		) const
 		{
 			if (a_column == 0)
 			{
 				return 0;
 			}
-			auto const pos = (a_width * a_line + (a_column - 1)) * a_dataSize
-				+ a_dataOffset;
+			auto const pos = (a_width * a_line + (a_column - 1)) * a_data_size
+				+ a_data_offset;
 			return a_data[pos];
 		}
 	};
 
-	template <typename AllocatorType>
-	struct UnfilterFunction<FilterType::Up, AllocatorType>
+	template <typename AllocatorT>
+	struct unfilter_function<filter_type::up, AllocatorT>
 	{
 		std::uint8_t operator()(
-			std::vector<std::uint8_t, AllocatorType> const& a_data
+			std::vector<std::uint8_t, AllocatorT> const& a_data
 			, std::size_t const a_width
-			, std::size_t const a_dataSize
+			, std::size_t const a_data_size
 			, std::size_t const a_line
 			, std::size_t const a_column
-			, std::size_t const a_dataOffset
-			) const
+			, std::size_t const a_data_offset
+		) const
 		{
 			if (a_line == 0)
 			{
 				return 0;
 			}
-			auto const pos = (a_width * (a_line - 1) + a_column) * a_dataSize
-				+ a_dataOffset;
+			auto const pos = (a_width * (a_line - 1) + a_column) * a_data_size
+				+ a_data_offset;
 			return a_data[pos];
 		}
 	};
 
-	template <typename AllocatorType>
-	struct UnfilterFunction<FilterType::Average, AllocatorType>
+	template <typename AllocatorT>
+	struct unfilter_function<filter_type::average, AllocatorT>
 	{
 		std::uint8_t operator()(
-			std::vector<std::uint8_t, AllocatorType> const& a_data
+			std::vector<std::uint8_t, AllocatorT> const& a_data
 			, std::size_t const a_width
-			, std::size_t const a_dataSize
+			, std::size_t const a_data_size
 			, std::size_t const a_line
 			, std::size_t const a_column
-			, std::size_t const a_dataOffset
-			) const
+			, std::size_t const a_data_offset
+		) const
 		{
-			auto const sub = UnfilterFunction<FilterType::Sub, AllocatorType>{}(
-				a_data, a_width, a_dataSize, a_line, a_column, a_dataOffset
-				);
-			auto const up = UnfilterFunction<FilterType::Up, AllocatorType>{}(
-				a_data, a_width, a_dataSize, a_line, a_column, a_dataOffset
-				);
+			auto const sub = unfilter_function<filter_type::sub, AllocatorT>{}(
+				a_data, a_width, a_data_size, a_line, a_column, a_data_offset
+			);
+			auto const up = unfilter_function<filter_type::up, AllocatorT>{}(
+				a_data, a_width, a_data_size, a_line, a_column, a_data_offset
+			);
 
 			return (std::uint16_t{ sub } +up) / 2;
 		}
 	};
 
 	template <typename AllocatorType>
-	struct UnfilterFunction<FilterType::Paeth, AllocatorType>
+	struct unfilter_function<filter_type::paeth, AllocatorType>
 	{
 		std::uint8_t operator()(
 			std::vector<std::uint8_t, AllocatorType> const& a_data
@@ -344,262 +328,224 @@ namespace vob::img::png::detail
 			, std::size_t const a_line
 			, std::size_t const a_column
 			, std::size_t const a_dataOffset
-			) const
+		) const
 		{
-			auto const sub = UnfilterFunction<FilterType::Sub, AllocatorType>{}(
+			auto const sub = unfilter_function<filter_type::sub, AllocatorType>{}(
 				a_data, a_width, a_dataSize, a_line, a_column, a_dataOffset
-				);
-			auto const up = UnfilterFunction<FilterType::Up, AllocatorType>{}(
+			);
+			auto const up = unfilter_function<filter_type::up, AllocatorType>{}(
 				a_data, a_width, a_dataSize, a_line, a_column, a_dataOffset
-				);
-			auto subUp = std::uint8_t{ 0 };
+			);
+			auto sub_up = std::uint8_t{ 0 };
 			if (a_line > 0 && a_column > 0)
 			{
 				auto const pos = (a_width * (a_line - 1) + (a_column - 1))
 					* a_dataSize + a_dataOffset;
-				subUp = a_data[pos];
+				sub_up = a_data[pos];
 			}
-			auto const p = std::int16_t{ sub } +up - subUp;
-			auto const pSub = std::abs(p - sub);
-			auto const pUp = std::abs(p - up);
-			auto const pSubUp = std::abs(p - subUp);
-			if (pSub <= pUp && pSub <= pSubUp)
+			auto const p = std::int16_t{ sub } + up - sub_up;
+			auto const p_sub = std::abs(p - sub);
+			auto const p_up = std::abs(p - up);
+			auto const p_sub_up = std::abs(p - sub_up);
+			if (p_sub <= p_up && p_sub <= p_sub_up)
 			{
 				return sub;
 			}
-			else if (pUp <= pSubUp)
+			else if (p_up <= p_sub_up)
 			{
 				return up;
 			}
 			else
 			{
-				return subUp;
+				return sub_up;
 			}
 		}
 	};
 
 	template <
-		FilterType t_filterType
-		, typename IteratorType
-		, typename AllocatorType
+		filter_type FilterType
+		, typename IteratorT
+		, typename AllocatorT
 	>
-	void unfilterLine(
-		IteratorType& a_in
-		, std::vector<std::uint8_t, AllocatorType>& a_data
+	void unfilter_line(
+		IteratorT& a_in
+		, std::vector<std::uint8_t, AllocatorT>& a_data
 		, std::size_t const a_width
-		, std::size_t const a_dataSize
+		, std::size_t const a_data_size
 		, std::size_t const a_line
 	)
 	{
-		using UnfilterFunction = UnfilterFunction<t_filterType, AllocatorType>;
+		using unfilter_function = unfilter_function<FilterType, AllocatorT>;
 		for (auto j = 0u; j < a_width; ++j)
 		{
-			for (auto b = 0u; b < a_dataSize; ++b)
+			for (auto b = 0u; b < a_data_size; ++b)
 			{
-				a_data[(a_line * a_width + j) * a_dataSize + b] =
-					(*a_in++) + UnfilterFunction{}(
-						a_data
-						, a_width
-						, a_dataSize
-						, a_line
-						, j
-						, b
-					);
+				a_data[(a_line * a_width + j) * a_data_size + b] = (*a_in++) + unfilter_function{}(
+					a_data
+					, a_width
+					, a_data_size
+					, a_line
+					, j
+					, b
+				);
 			}
 		}
 	}
 
 	template <
-		typename IteratorType
-		, typename AllocatorType
+		typename IteratorT
+		, typename AllocatorT
 	>
-	void unfilterLine(
-		IteratorType& a_in
-		, std::vector<std::uint8_t, AllocatorType>& a_data
+	void unfilter_line(
+		IteratorT& a_in
+		, std::vector<std::uint8_t, AllocatorT>& a_data
 		, std::size_t const a_width
-		, std::size_t const a_dataSize
+		, std::size_t const a_data_size
 		, std::size_t const a_line
 	)
 	{
-		auto const filterType = static_cast<FilterType>(*a_in++);
-		switch (filterType)
+		switch (static_cast<filter_type>(*a_in++))
 		{
-		case FilterType::Sub:
+		case filter_type::sub:
 		{
-			unfilterLine<FilterType::Sub>(
-				a_in
-				, a_data
-				, a_width
-				, a_dataSize
-				, a_line
-			);
+			unfilter_line<filter_type::sub>(a_in, a_data, a_width, a_data_size, a_line);
 			break;
 		}
-		case FilterType::Up:
+		case filter_type::up:
 		{
-			unfilterLine<FilterType::Up>(
-				a_in
-				, a_data
-				, a_width
-				, a_dataSize
-				, a_line
-			);
+			unfilter_line<filter_type::up>(a_in, a_data, a_width, a_data_size, a_line);
 			break;
 		}
-		case FilterType::Average:
+		case filter_type::average:
 		{
-			unfilterLine<FilterType::Average>(
-				a_in
-				, a_data
-				, a_width
-				, a_dataSize
-				, a_line
-			);
+			unfilter_line<filter_type::average>(a_in, a_data, a_width, a_data_size, a_line);
 			break;
 		}
-		case FilterType::Paeth:
+		case filter_type::paeth:
 		{
-			unfilterLine<FilterType::Paeth>(
-				a_in
-				, a_data
-				, a_width
-				, a_dataSize
-				, a_line
-			);
+			unfilter_line<filter_type::paeth>(a_in, a_data, a_width, a_data_size, a_line);
+			break;
+		}
+		case filter_type::none:
+		{
+			unfilter_line<filter_type::none>(a_in, a_data, a_width, a_data_size, a_line);
 			break;
 		}
 		default:
-		{
-			unfilterLine<FilterType::None>(
-				a_in
-				, a_data
-				, a_width
-				, a_dataSize
-				, a_line
-			);
-			break;
-		}
+			throw stream_error{ "invalid png filter type" };
 		}
 	}
 
-	template <typename IteratorType, typename AllocatorType>
+	template <typename IteratorT, typename AllocatorT>
 	auto unfilter(
-		IteratorType& a_in
+		IteratorT& a_in
 		, std::size_t const a_height
 		, std::size_t const a_width
-		, std::uint8_t const a_dataSize
-		, AllocatorType const& a_allocator
+		, std::uint8_t const a_data_size
+		, AllocatorT const& a_allocator
 	)
 	{
-		using Allocator = sta::ReboundAlloc<AllocatorType, std::uint8_t>;
-		std::vector<std::uint8_t, Allocator> r_data{ Allocator{ a_allocator} };
-		r_data.resize(a_height * a_width * a_dataSize);
+		using allocator_traits = std::allocator_traits<AllocatorT>;
+		using uint8_allocator = typename allocator_traits::template rebind_alloc<std::uint8_t>;
+		std::vector<std::uint8_t, AllocatorT> r_data{ AllocatorT{ a_allocator} };
+		r_data.resize(a_height * a_width * a_data_size);
 		for (auto i = 0u; i < a_height; ++i)
 		{
-			unfilterLine(a_in, r_data, a_width, a_dataSize, i);
+			unfilter_line(a_in, r_data, a_width, a_data_size, i);
 		}
 		return r_data;
 	}
 
-	inline auto computeBytesPerPixel(Header const& a_header)
+	inline auto compute_bytes_per_pixel(header_chunk const& a_header_chunk)
 	{
-		auto const bitsPerPixel = a_header.m_channelDepth
-			* s_channelCount[a_header.m_colorType];
-		return (bitsPerPixel + 7u) / 8u;
+		auto const bits_per_pixel =
+			a_header_chunk.channel_depth * channel_count[a_header_chunk.color_type];
+		return (bits_per_pixel + 7u) / 8u;
 	}
 
-	inline auto computeRawDataSize(Header const& a_header)
+	inline auto compute_raw_data_size(header_chunk const& a_header_chunk)
 	{
-		auto const bytesPerPixel = computeBytesPerPixel(a_header);
+		auto const bytes_per_pixel = compute_bytes_per_pixel(a_header_chunk);
 
 		// No interlace
-		if (a_header.m_interlaceMethod == 0)
+		if (a_header_chunk.interlace_method == 0)
 		{
-			return std::size_t{ a_header.m_height }
-				* a_header.m_width
-				* bytesPerPixel
-				+ a_header.m_height;
+			return std::size_t{ a_header_chunk.height }
+				*a_header_chunk.width
+				* bytes_per_pixel
+				+ a_header_chunk.height;
 		}
 		// Adam7 interlace
 		std::size_t size = 0u;
 		for (auto a = 0; a < 7; ++a)
 		{
-			auto const height = adamSize<Side::Height>(a, a_header.m_height);
-			auto const width = adamSize<Side::Width>(a, a_header.m_width);
-			size += height * (width * bytesPerPixel + 1);
+			auto const height = adam7_size<side::height>(a, a_header_chunk.height);
+			auto const width = adam7_size<side::width>(a, a_header_chunk.width);
+			size += height * (width * bytes_per_pixel + 1);
 		}
 		return size;
 	}
 
-	inline void readDataChunks(
-		std::istream& a_inputStream
-		, std::basic_ostream<std::uint8_t>& a_outputStream
+	inline void read_data_chunks(
+		std::istream& a_input_stream
+		, std::ostream& a_output_stream
 	)
 	{
-		auto nextChunkType = peekChunkType(a_inputStream);
-		while (nextChunkType == 'IDAT')
+		auto next_chunk_type = peek_chunk_type(a_input_stream);
+		while (next_chunk_type == 'IDAT')
 		{
-			readDataChunk(a_inputStream, a_outputStream);
-			nextChunkType = peekChunkType(a_inputStream);
+			read_data_chunk(a_input_stream, a_output_stream);
+			next_chunk_type = peek_chunk_type(a_input_stream);
 		}
 	}
 
-	template <typename AllocatorType>
-	inline auto readData(
-		Header const& a_header
-		, std::istream& a_inputStream
-		, AllocatorType a_allocator
+	template <typename Allocator>
+	inline auto read_data(
+		header_chunk const& a_header_chunk
+		, std::istream& a_input_stream
+		, Allocator a_allocator
 	)
 	{
-		using Uint8Allocator = typename sta::ReboundAlloc<AllocatorType, std::uint8_t>;
-		auto const allocator = Uint8Allocator{ a_allocator };
+		using allocator_traits = std::allocator_traits<Allocator>;
+		using uint8_allocator = typename allocator_traits::template rebind_alloc<std::uint8_t>;
+		auto const allocator = uint8_allocator{ a_allocator };
 
-		auto const rawDataSize = computeRawDataSize(a_header);
-		std::vector<std::uint8_t, Uint8Allocator> rawData(rawDataSize, allocator);
-		auto rawDataStreamBuffer = sta::makeVectorStreamBuffer(rawData);
-		std::basic_ostream<std::uint8_t> outputStream{ &rawDataStreamBuffer };
-		readDataChunks(a_inputStream, outputStream);
+		auto const raw_data_size = compute_raw_data_size(a_header_chunk);
+		sta::vector_streambuf<char, uint8_allocator> raw_data_stream_buffer{ raw_data_size };
+		std::ostream output_stream{ &raw_data_stream_buffer };
+		read_data_chunks(a_input_stream, output_stream);
 
-		auto const bytesPerPixel = computeBytesPerPixel(a_header);
-		auto begin = rawData.begin();
+		auto const bytes_per_pixel = compute_bytes_per_pixel(a_header_chunk);
+		auto raw_data = raw_data_stream_buffer.collect(0);
+		auto begin = raw_data.begin();
 
 		// No interlace
-		if (a_header.m_interlaceMethod == 0)
+		if (a_header_chunk.interlace_method == 0)
 		{
 			return unfilter(
-				begin
-				, a_header.m_height
-				, a_header.m_width
-				, bytesPerPixel
-				, a_allocator
+				begin, a_header_chunk.height, a_header_chunk.width, bytes_per_pixel, a_allocator
 			);
 		}
 		// Adam7 interlace
-		auto const dataSize = a_header.m_height * a_header.m_width * bytesPerPixel;
-		std::vector<std::uint8_t, Uint8Allocator> r_data(dataSize, allocator);
+		auto const data_size = a_header_chunk.height * a_header_chunk.width * bytes_per_pixel;
+		std::vector<std::uint8_t, uint8_allocator> r_data(data_size, allocator);
 		for (auto a = 0; a < 7; ++a)
 		{
-			auto const height = adamSize<Side::Height>(a, a_header.m_height);
-			auto const width = adamSize<Side::Width>(a, a_header.m_width);
+			auto const height = adam7_size<side::height>(a, a_header_chunk.height);
+			auto const width = adam7_size<side::width>(a, a_header_chunk.width);
 			if (height == 0 || width == 0)
 			{
 				continue;
 			}
 
-			auto const subData = unfilter(
-				begin
-				, height
-				, width
-				, bytesPerPixel
-				, a_allocator
-			);
+			auto const sub_data = unfilter(begin, height, width, bytes_per_pixel, a_allocator);
 
-			for (auto index = 0u; index < subData.size(); ++index)
+			for (auto index = 0u; index < sub_data.size(); ++index)
 			{
-				auto const realIndex = adamIndex(
-					a_header.m_width, a, index / bytesPerPixel
-				) * bytesPerPixel + index % bytesPerPixel;
-				r_data[realIndex] = subData[index];
+				auto const real_index = adam7_index(
+					a_header_chunk.width, a, index / bytes_per_pixel
+				) * bytes_per_pixel + index % bytes_per_pixel;
+				r_data[real_index] = sub_data[index];
 			}
 		}
 
@@ -607,97 +553,91 @@ namespace vob::img::png::detail
 	}
 
 	template <
-		img::ColorType t_outColorType, typename OutChannelType
-		, ColorType t_inColorType, std::uint8_t t_inChannelDepth
+		img::color_type OutColorType, typename OutChannelT
+		, color_type InColorType, std::uint8_t InChannelDepth
 	>
-	struct ToPixel;
+	struct to_pixel;
 
 	template <>
-	struct ToPixel<img::ColorType::RGB, std::uint8_t, ColorType::RGB, 8>
+	struct to_pixel<img::color_type::rgb, std::uint8_t, color_type::rgb, 8>
 	{
-		template <typename IteratorType>
-		auto operator()(IteratorType a_firstByte)
+		template <typename IteratorT>
+		auto operator()(IteratorT a_firstByte)
 		{
-			return Pixel<img::ColorType::RGB, std::uint8_t>{
+			return pixel<img::color_type::rgb, std::uint8_t>{
 				*a_firstByte, *(a_firstByte + 1), *(a_firstByte + 2)
 			};
 		}
 	};
 
 	template <>
-	struct ToPixel<img::ColorType::RGBA, std::uint8_t, ColorType::RGB, 8>
+	struct to_pixel<img::color_type::rgb_alpha, std::uint8_t, color_type::rgb, 8>
 	{
-		template <typename IteratorType>
-		auto operator()(IteratorType a_firstByte)
+		template <typename IteratorT>
+		auto operator()(IteratorT a_firstByte)
 		{
-			return Pixel<img::ColorType::RGB, std::uint8_t>{
+			return pixel<img::color_type::rgb, std::uint8_t>{
 				*a_firstByte, *(a_firstByte + 1), *(a_firstByte + 2), 1
 			};
 		}
 	};
 
 	template <>
-	struct ToPixel<img::ColorType::RGB, std::uint8_t, ColorType::RGBA, 8>
+	struct to_pixel<img::color_type::rgb, std::uint8_t, color_type::rgb_alpha, 8>
 	{
-		template <typename IteratorType>
-		auto operator()(IteratorType a_firstByte)
+		template <typename IteratorT>
+		auto operator()(IteratorT a_firstByte)
 		{
-			return Pixel<img::ColorType::RGB, std::uint8_t>{
+			return pixel<img::color_type::rgb, std::uint8_t>{
 				*a_firstByte, *(a_firstByte + 1), *(a_firstByte + 2)
 			};
 		}
 	};
 
 	template <>
-	struct ToPixel<img::ColorType::RGBA, std::uint8_t, ColorType::RGBA, 8>
+	struct to_pixel<img::color_type::rgb_alpha, std::uint8_t, color_type::rgb_alpha, 8>
 	{
-		template <typename IteratorType>
-		auto operator()(IteratorType a_firstByte)
+		template <typename IteratorT>
+		auto operator()(IteratorT a_firstByte)
 		{
-			return Pixel<img::ColorType::RGB, std::uint8_t>{
-				*a_firstByte
-				, *(a_firstByte + 1)
-				, *(a_firstByte + 2)
-				, *(a_firstByte + 3)
+			return pixel<img::color_type::rgb_alpha, std::uint8_t>{
+				*a_firstByte, *(a_firstByte + 1), *(a_firstByte + 2), *(a_firstByte + 3)
 			};
 		}
 	};
 
 	template <
-		img::ColorType t_outColorType
-		, typename OutChannelType
-		, ColorType t_inColorType
-		, std::uint8_t t_inChannelDepth
-		, typename ImageAllocatorType
-		, typename DataAllocatorType
+		img::color_type OutColorType
+		, typename OutChannelT
+		, color_type InColorType
+		, std::uint8_t InChannelDepth
+		, typename ImageAllocatorT
+		, typename DataAllocatorT
 	>
-	auto toImage(
-		Header const& a_header
-		, std::vector<std::uint8_t, DataAllocatorType> const& a_data
-		, ImageAllocatorType const& a_imageAllocator
+	auto to_image(
+		header_chunk const& a_header_chunk
+		, std::vector<std::uint8_t, DataAllocatorT> const& a_data
+		, ImageAllocatorT const& a_image_allocator
 	)
 	{
-		using Pixel = Pixel<t_outColorType, OutChannelType>;
-		using PixelAllocator = sta::ReboundAlloc<ImageAllocatorType, Pixel>;
-		Image<t_outColorType, OutChannelType, PixelAllocator> r_image{
-			a_header.m_height
-			, a_header.m_width
-			, PixelAllocator{ a_imageAllocator }
+		using pixel = pixel<OutColorType, OutChannelT>;
+		using image_allocator_traits = std::allocator_traits<ImageAllocatorT>;
+		using pixel_allocator_type = typename image_allocator_traits::template rebind_alloc<pixel>;
+		image<OutColorType, OutChannelT, pixel_allocator_type> r_image{
+			a_header_chunk.height
+			, a_header_chunk.width
+			, pixel_allocator_type{ a_image_allocator }
 		};
 
-		auto const bytesPerPixel = computeBytesPerPixel(a_header);
-		auto currentInIt = a_data.begin();
-		for (auto i = 0u; i < a_header.m_height; ++i)
+		auto const bytes_per_pixel = compute_bytes_per_pixel(a_header_chunk);
+		auto current_in_it = a_data.begin();
+		for (auto i = 0u; i < a_header_chunk.height; ++i)
 		{
-			for (auto j = 0u; j < a_header.m_width; ++j)
+			for (auto j = 0u; j < a_header_chunk.width; ++j)
 			{
-				r_image.at(i, j) = ToPixel<
-					t_outColorType
-					, OutChannelType
-					, t_inColorType
-					, t_inChannelDepth
-				>{}(currentInIt);
-				currentInIt += bytesPerPixel;
+				using to_pixel = to_pixel<OutColorType, OutChannelT, InColorType, InChannelDepth>;
+				r_image.at(i, j) = to_pixel{}(current_in_it);
+				current_in_it += bytes_per_pixel;
 			}
 		}
 
@@ -705,146 +645,112 @@ namespace vob::img::png::detail
 	}
 
 	template <
-		img::ColorType t_outColorType
-		, typename OutChannelType
-		, ColorType t_inColorType
-		, typename ImageAllocatorType
-		, typename DataAllocatorType
+		img::color_type OutColorType
+		, typename OutChannelT
+		, color_type InColorType
+		, typename ImageAllocatorT
+		, typename DataAllocatorT
 	>
-	auto toImage(
-		Header const& a_header
-		, std::vector<std::uint8_t, DataAllocatorType> const& a_data
-		, ImageAllocatorType const& a_imageAllocator
+	auto to_image(
+		header_chunk const& a_header_chunk
+		, std::vector<std::uint8_t, DataAllocatorT> const& a_data
+		, ImageAllocatorT const& a_image_allocator
 	)
 	{
-		switch (a_header.m_channelDepth)
+		switch (a_header_chunk.channel_depth)
 		{
 		case 8:
 		{
-			return toImage<
-				t_outColorType
-				, OutChannelType
-				, t_inColorType
-				, 8
-				, ImageAllocatorType
-			>(
-				a_header
-				, a_data
-				, a_imageAllocator
+			return to_image<OutColorType, OutChannelT, InColorType, 8, ImageAllocatorT>(
+				a_header_chunk, a_data, a_image_allocator
 			);
 		}
 		default:
-			assert(false && "Channel depth not supported");
-			throw sta::NotImplemented{};
+			throw sta::not_implemented{};
 		}
 	}
 
 	template <
-		img::ColorType t_outColorType
-		, typename OutChannelType
-		, typename ImageAllocatorType
-		, typename DataAllocatorType
+		img::color_type OutColorType
+		, typename OutChannelT
+		, typename ImageAllocatorT
+		, typename DataAllocatorT
 	>
-	auto toImage(
-		Header const& a_header
-		, std::vector<std::uint8_t, DataAllocatorType> const& a_data
-		, ImageAllocatorType const& a_imageAllocator
+	auto to_image(
+		header_chunk const& a_header_chunk
+		, std::vector<std::uint8_t, DataAllocatorT> const& a_data
+		, ImageAllocatorT const& a_image_allocator
 	)
 	{
-		switch (static_cast<ColorType>(a_header.m_colorType))
+		switch (static_cast<color_type>(a_header_chunk.color_type))
 		{
-		case ColorType::RGB:
+		case color_type::rgb:
 		{
-			return toImage<
-				t_outColorType
-				, OutChannelType
-				, ColorType::RGB
-				, ImageAllocatorType
-			>(
-				a_header
-				, a_data
-				, a_imageAllocator
+			return to_image<OutColorType, OutChannelT, color_type::rgb, ImageAllocatorT>(
+				a_header_chunk, a_data, a_image_allocator
 			);
 		}
-		case ColorType::RGBA:
+		case color_type::rgb_alpha:
 		{
-			return toImage<
-				t_outColorType
-				, OutChannelType
-				, ColorType::RGBA
-				, ImageAllocatorType
-			>(
-				a_header
-				, a_data
-				, a_imageAllocator
+			return to_image<OutColorType, OutChannelT, color_type::rgb_alpha, ImageAllocatorT>(
+				a_header_chunk, a_data, a_image_allocator
 			);
 		}
 		default:
-			assert(false && "Color type not supported");
-			throw sta::NotImplemented{};
+			throw sta::not_implemented{};
 		}
 	}
 
-	inline void ignoreHeader(std::istream& a_inputStream)
+	inline void ignore_header(std::istream& a_inputStream)
 	{
-		sta::expect<InvalidPngStream>(canLoad(a_inputStream));
+		img::detail::expect(can_load(a_inputStream), "not enough bytes to read png header");
 		a_inputStream.ignore(8);
 	}
 	
 	template <
-		img::ColorType t_colorType
-		, typename ChannelType
-		, typename ImageAllocatorType = std::pmr::polymorphic_allocator<ChannelType>
-		, typename StackAllocatorType = ImageAllocatorType
+		img::color_type ColorType
+		, typename ChannelT
+		, typename ImageAllocatorT = std::pmr::polymorphic_allocator<ChannelT>
+		, typename StackAllocatorT = ImageAllocatorT
 	>
-	auto readPng(
-		std::istream& a_inputStream
-		, ImageAllocatorType a_imageAllocator = {}
-		, StackAllocatorType a_stackAllocator = a_imageAllocator
+	auto do_read(
+		std::istream& a_input_stream
+		, ImageAllocatorT a_image_allocator = {}
+		, StackAllocatorT a_stack_allocator = a_image_allocator
 	)
 	{
-		ignoreHeader(a_inputStream);
+		ignore_header(a_input_stream);
 
 		// IHDR
-		sta::expect<MustStartByIhdrChunk>(peekChunkType(a_inputStream) == 'IHDR');
-		auto const header = readHeaderChunk(a_inputStream);
-		assert(header.m_colorType == 2 || header.m_colorType == 6
-			&& "Color type not supported");
-		sta::expect<sta::NotImplemented>(
-			header.m_colorType == 2 || header.m_colorType == 6
+		img::detail::expect(
+			peek_chunk_type(a_input_stream) == 'IHDR', "png must start with IHDR chunk"
 		);
-		assert(header.m_channelDepth == 8 || header.m_channelDepth == 16
-			&& "Color depth less than 8 not supported");
-		sta::expect<sta::NotImplemented>(
-			header.m_channelDepth == 8 || header.m_channelDepth == 16
-			);
+		auto const header = read_header_chunk(a_input_stream);
+		sta::expect<sta::not_implemented>(header.color_type == 2 || header.color_type == 6);
+		sta::expect<sta::not_implemented>(header.channel_depth == 8 || header.channel_depth == 16);
 
 		// ANY*
-		auto chunkType = peekChunkType(a_inputStream);
-		while (chunkType != 'IDAT')
+		auto chunk_type = peek_chunk_type(a_input_stream);
+		while (chunk_type != 'IDAT')
 		{
-			ignoreChunk(a_inputStream);
-			chunkType = peekChunkType(a_inputStream);
+			ignore_chunk(a_input_stream);
+			chunk_type = peek_chunk_type(a_input_stream);
 		}
 
 		// IDAT+
-		auto const data = readData(header, a_inputStream, a_stackAllocator);
-		auto r_image = toImage<t_colorType, ChannelType>(
-			header
-			, data
-			, a_imageAllocator
-		);
+		auto const data = read_data(header, a_input_stream, a_stack_allocator);
+		auto r_image = to_image<ColorType, ChannelT>(header, data, a_image_allocator);
 
 		// ANY*
-		chunkType = peekChunkType(a_inputStream);
-		while (chunkType != 'IEND')
+		chunk_type = peek_chunk_type(a_input_stream);
+		while (chunk_type != 'IEND')
 		{
-			ignoreChunk(a_inputStream);
-			chunkType = peekChunkType(a_inputStream);
+			ignore_chunk(a_input_stream);
+			chunk_type = peek_chunk_type(a_input_stream);
 		}
 
 		// IEND
-		ignoreChunk(a_inputStream);
+		ignore_chunk(a_input_stream);
 
 		return r_image;
 	}
@@ -853,21 +759,19 @@ namespace vob::img::png::detail
 namespace vob::img::png
 {
 	template <
-		img::ColorType t_colorType
-		, typename ChannelType
-		, typename ImageAllocatorType = std::pmr::polymorphic_allocator<ChannelType>
-		, typename StackAllocatorType = ImageAllocatorType
+		img::color_type ColorType
+		, typename ChannelT
+		, typename ImageAllocatorT = std::pmr::polymorphic_allocator<ChannelT>
+		, typename StackAllocatorT = ImageAllocatorT
 	>
 	auto read(
 		std::istream& a_inputStream
-		, ImageAllocatorType a_imageAllocator = {}
-		, StackAllocatorType a_stackAllocator = a_imageAllocator
+		, ImageAllocatorT a_image_allocator = {}
+		, StackAllocatorT a_stack_allocator = a_image_allocator
 	)
 	{
-		return detail::readPng<t_colorType, ChannelType>(
-			a_inputStream
-			, a_imageAllocator
-			, a_stackAllocator
+		return detail::do_read<ColorType, ChannelT>(
+			a_inputStream, a_image_allocator, a_stack_allocator
 		);
 	}
 }

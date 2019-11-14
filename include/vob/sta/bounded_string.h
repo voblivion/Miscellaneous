@@ -3,113 +3,98 @@
 #include <array>
 #include <cstddef>
 #include <exception>
+#include <vob/sta/algorithm.h>
 
-#include <vob/sta/compiler.h>
-#include <vob/sta/memory_resource.h>
-
-
-#ifndef VOB_STA_BOUNDED_STRING_DEBUG
+#ifndef VOB_STD_BOUNDED_STRING_DEBUG
 #ifdef NDEBUG
-#define VOB_STA_BOUNDED_STRING_DEBUG 0
+#define VOB_STD_BOUNDED_STRING_DEBUG 0
 #else
-#define VOB_STA_BOUNDED_STRING_DEBUG 1
+#define VOB_STD_BOUNDED_STRING_DEBUG 1
 #endif
 #endif
 
 namespace vob::sta
 {
-	struct Throw {};
-	constexpr Throw s_throw = {};
-
-	struct SourceStringTooBig
-		: std::exception
+	struct source_string_too_big final
+		: exception
 	{
-		SourceStringTooBig(std::size_t const a_source, std::size_t const a_target)
-			: m_source{ a_source }
-			, m_target{ a_target }
+		source_string_too_big(std::size_t const a_source, std::size_t const a_target)
+			: source{ a_source }
+			, target{ a_target }
 		{}
 
-		std::size_t m_source;
-		std::size_t m_target;
+		std::size_t source;
+		std::size_t target;
 	};
 
-	template <
-		std::size_t t_maxSize
-		, typename CharType = char
-	>
-	class BoundedString
+	template <size_t MaxSize, typename CharT = char>
+	class bounded_string
 	{
 	public:
-		// Constructors
-		constexpr BoundedString() noexcept = default;
-		explicit constexpr BoundedString(BoundedString const& a_other) noexcept
+#pragma region Statics & Aliases
+		using char_type = CharT;
+#pragma endregion
+#pragma region Constructors
+		constexpr bounded_string() noexcept = default;
+		explicit constexpr bounded_string(bounded_string const& a_other) noexcept
 		{
-			setData(a_other);
+			assign(a_other);
 		};
-		template <typename StringType>
-		explicit constexpr BoundedString(StringType const& a_string) noexcept
+		explicit constexpr bounded_string(bounded_string&& a_other) noexcept
 		{
-			setData(a_string);
+			assign(a_other);
 		}
-		template <typename StringType>
-		explicit constexpr BoundedString(StringType const& a_string, Throw)
+		template <typename StringT>
+		explicit constexpr bounded_string(StringT const& a_string) noexcept
 		{
-			setData(a_string, s_throw);
+			assign(a_string);
 		}
 
-		// Methods
+		// Destructor
+		~bounded_string() = default;
+#pragma endregion
+#pragma region Methods
 		constexpr auto data() const noexcept
 		{
 			return m_data.data();
 		}
-
 		constexpr auto size() const noexcept
 		{
 			return m_size;
 		}
 
-		template <typename StringType>
-		constexpr void setData(StringType const& a_string) noexcept
+		template <typename StringT>
+		constexpr void assign(StringT const& a_string) noexcept
 		{
 			m_size = std::min(a_string.size(), m_data.size());
-			sta::copy(a_string.data(), m_size, m_data.data());
+			fix_c20_copy(a_string.data(), m_size, m_data.data());
 		}
-
-		template <typename StringType>
-		constexpr void setData(StringType const& a_string, Throw)
-		{
-			if (a_string.size() > m_data.size())
-			{
-				throw SourceStringTooBig{ a_string.size(), m_data.size() };
-			}
-			m_size = a_string.size();
-			sta::copy(a_string.data(), m_size, m_data.data());
-		}
-
-		// Operators
-		constexpr operator std::basic_string_view<CharType>()
+#pragma endregion
+#pragma region Operators
+		explicit constexpr operator std::basic_string_view<CharT>()
 		{
 			return { data(), size() };
 		}
 
-		constexpr auto& operator=(BoundedString const& a_other)
+		constexpr auto& operator=(bounded_string const& a_other) noexcept
 		{
-			setData(std::basic_string_view<CharType>{ a_other });
+			assign(std::basic_string_view<CharT>{ a_other });
 			return *this;
 		}
 
-		constexpr auto& operator=(BoundedString&& a_other)
+		constexpr auto& operator=(bounded_string&& a_other) noexcept
 		{
-			setData(a_other);
+			assign(a_other);
 			return *this;
 		}
-
+#pragma endregion
 	private:
-		// Attributes
-		std::array<CharType, t_maxSize> m_data = {};
+#pragma region Attributes
+		std::array<CharT, MaxSize> m_data = {};
 		std::size_t m_size = 0;
-#if VOB_STA_BOUNDED_STRING_DEBUG == 1
-		CharType const* const m_debug = &m_data[0];
+#if VOB_STD_BOUNDED_STRING_DEBUG == 1
+		CharT const* const m_debug = &m_data[0];
 #endif
+#pragma endregion
 	};
 }

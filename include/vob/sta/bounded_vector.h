@@ -2,96 +2,151 @@
 
 #include <array>
 #include <cassert>
-
+#include <vob/sta/error.h>
 
 namespace vob::sta
 {
-	template <typename Type, std::size_t t_maxSize>
-	class BoundedVector
+	template <typename T, size_t MaxSize>
+	class bounded_vector
 	{
-		using Base = std::pmr::vector<Type>;
-		static constexpr std::size_t s_bytes = sizeof(Type);
 	public:
-		BoundedVector()
-			: m_begin{ reinterpret_cast<Type*>(m_buffer.data()) }
-		{}
+#pragma region Aliases
+		using value_type = T;
+		using allocator_type = add_pointer_t<value_type>;
+		using size_type = size_t;
+		using difference_type = ptrdiff_t;
+		using reference = add_lvalue_reference_t<value_type>;
+		using const_reference = add_lvalue_reference_t<add_const_t<value_type>>;
+		using pointer = add_pointer_t<value_type>;
+		using const_pointer = add_pointer_t<add_const_t<value_type>>;
+		using iterator = pointer;
+		using const_iterator = const_pointer;
+#pragma endregion
+#pragma region Constructors
+		bounded_vector() = default;
 
-		~BoundedVector()
+		bounded_vector(bounded_vector const& a_other)
 		{
-			while (!empty())
+			for (auto& value : a_other)
 			{
-				pop_back();
+				push_back(value);
 			}
 		}
 
-		auto empty() const
+		bounded_vector(std::initializer_list<T> a_init)
+		{
+			T* ptr = begin();
+			/*for (auto& value : a_init)
+			{
+				new(ptr++) Type(value);
+				++m_size;
+			}*/
+		}
+
+		bounded_vector(bounded_vector&&) = delete;
+
+		~bounded_vector()
+		{
+			while (!empty())
+			{
+				do_pop_back();
+			}
+		}
+#pragma endregion
+#pragma region Methods
+		constexpr auto empty() const noexcept
 		{
 			return m_size == 0;
 		}
 
-		auto size() const
+		constexpr auto size() const noexcept
 		{
 			return m_size;
 		}
 
-		auto data()
+		constexpr auto data() noexcept
 		{
-			return reinterpret_cast<Type*>(m_buffer.data());
+			return reinterpret_cast<T*>(m_buffer.data());
 		}
 
-		auto data() const
+		constexpr auto data() const noexcept
 		{
-			return reinterpret_cast<Type const*>(m_buffer.data());
+			return reinterpret_cast<T const*>(m_buffer.data());
 		}
 
-		auto begin()
+		constexpr auto begin() noexcept
 		{
 			return data();
 		}
 
-		auto begin() const
+		constexpr auto begin() const noexcept
 		{
 			return data();
 		}
 
-		auto end()
+		constexpr auto end() noexcept
 		{
 			return begin() + m_size;
 		}
 
-		auto end() const
+		constexpr auto end() const noexcept
 		{
 			return begin() + m_size;
 		}
 
-		auto push_back(Type&& a_value)
+		auto push_back(T const& a_value)
 		{
-			assert(m_size < t_maxSize);
-			auto ptr = begin() + s_bytes * ++m_size;
-			return new(ptr) Type(std::forward(a_value));
+			expect(m_size < MaxSize, length_error{ "Adding value in full bounded_vector." });
+			auto ptr = begin() + m_size++;
+			return new(ptr) T(a_value);
+		}
+		
+		auto push_back(T&& a_value)
+		{
+			expect(m_size < MaxSize, length_error{ "Adding value in full bounded_vector." });
+			auto ptr = begin() + m_size++;
+			return new(ptr) T(std::forward(a_value));
 		}
 
 		template <typename... Args>
 		auto emplace_back(Args&&... a_args)
 		{
-			assert(m_size < t_maxSize);
-			auto ptr = begin() + s_bytes * m_size++;
-			ptr = new(ptr) Type{ std::forward<Args>(a_args)... };
+			expect(m_size < MaxSize, length_error{ "Adding value in full bounded_vector." });
+			auto ptr = begin() + m_size++;
+			ptr = new(ptr) T{ std::forward<Args>(a_args)... };
 			return ptr;
 		}
 
 		auto pop_back()
 		{
-			assert(m_size > 0);
-			auto ptr = begin() + s_bytes * --m_size;
-			ptr->~Type();
+			expect(m_size > 0, length_error{ "Calling pop_back on empty bounded_vector." });
+			do_pop_back();
+		}
+#pragma endregion
+#pragma region Operators
+		bounded_vector& operator=(bounded_vector const& a_other)
+		{
+			for (auto& value : a_other)
+			{
+				push_back(value);
+			}
+			return *this;
 		}
 
+		bounded_vector& operator=(bounded_vector&&) = delete;
+#pragma endregion
+
 	private:
-		// Attributes
-		alignas(alignof(Type))
-			std::array<std::byte, s_bytes * t_maxSize> m_buffer;
-		Type* m_begin;
+#pragma region Attributes
+		alignas(alignof(T)) std::array<std::byte, sizeof(T) * MaxSize> m_buffer{};
 		std::size_t m_size = 0;
+#pragma endregion
+#pragma region Methods
+		auto do_pop_back()
+		{
+			auto ptr = begin() + --m_size;
+			ptr->~T();
+		}
+#pragma endregion
 	};
 }
