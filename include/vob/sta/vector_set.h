@@ -56,6 +56,16 @@ namespace vob::sta
 			return m_data.empty();
 		}
 
+		auto size() const
+		{
+			return m_data.size();
+		}
+
+		void reserve(std::size_t const a_capacity)
+		{
+			m_data.reserve(a_capacity);
+		}
+
 		template <typename OtherKey>
 		decltype(auto) find(OtherKey const& a_key)
 		{
@@ -121,6 +131,12 @@ namespace vob::sta
 			}
 			return remove_count;
 		}
+
+		auto get_allocator() const
+		{
+			return m_data.get_allocator();
+		}
+
 	private:
 		std::vector<Key, Allocator> m_data;
 	};
