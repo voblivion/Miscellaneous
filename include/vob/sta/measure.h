@@ -50,6 +50,20 @@ namespace vob::sta
 		{
 			return static_cast<OtherValueType>(value);
 		}
+		template <typename OtherValueType>
+		friend constexpr bool operator<(
+			measure<ValueType, Units...> const& a_lhs
+			, measure<OtherValueType, Units...> const& a_rhs)
+		{
+			return a_lhs.value < a_rhs.value;
+		}
+		template <typename OtherValueType>
+		friend constexpr bool operator>(
+			measure<ValueType, Units...> const& a_lhs
+			, measure<OtherValueType, Units...> const& a_rhs)
+		{
+			return a_lhs.value > a_rhs.value;
+		}
 #pragma endregion
 	};
 
