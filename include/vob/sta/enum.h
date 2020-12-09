@@ -68,11 +68,6 @@ namespace vob::sta::detail
 		{
 			return "";
 		}
-		auto last_separator = fix_find_last_of(name, ':');
-		if (last_separator != string_view::npos)
-		{
-			return name.substr(last_separator + 1);
-		}
 		return name;
 	}
 
