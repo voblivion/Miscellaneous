@@ -16,7 +16,7 @@
 namespace vob::sta
 {
 	struct source_string_too_big final
-		: exception
+		: std::exception
 	{
 		source_string_too_big(std::size_t const a_source, std::size_t const a_target)
 			: source{ a_source }
