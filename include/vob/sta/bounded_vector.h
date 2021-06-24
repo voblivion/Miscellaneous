@@ -12,13 +12,13 @@ namespace vob::sta
 	public:
 #pragma region Aliases
 		using value_type = T;
-		using allocator_type = add_pointer_t<value_type>;
+		using allocator_type = std::add_pointer_t<value_type>;
 		using size_type = size_t;
-		using difference_type = ptrdiff_t;
-		using reference = add_lvalue_reference_t<value_type>;
-		using const_reference = add_lvalue_reference_t<add_const_t<value_type>>;
-		using pointer = add_pointer_t<value_type>;
-		using const_pointer = add_pointer_t<add_const_t<value_type>>;
+		using difference_type = std::ptrdiff_t;
+		using reference = std::add_lvalue_reference_t<value_type>;
+		using const_reference = std::add_lvalue_reference_t<std::add_const_t<value_type>>;
+		using pointer = std::add_pointer_t<value_type>;
+		using const_pointer = std::add_pointer_t<std::add_const_t<value_type>>;
 		using iterator = pointer;
 		using const_iterator = const_pointer;
 #pragma endregion
@@ -43,7 +43,7 @@ namespace vob::sta
 			}*/
 		}
 
-		bounded_vector(bounded_vector&&) = delete;
+		bounded_vector(bounded_vector&&) = default;
 
 		~bounded_vector()
 		{
@@ -96,14 +96,14 @@ namespace vob::sta
 
 		auto push_back(T const& a_value)
 		{
-			expect(m_size < MaxSize, length_error{ "Adding value in full bounded_vector." });
+			expect(m_size < MaxSize, std::length_error{ "Adding value in full bounded_vector." });
 			auto ptr = begin() + m_size++;
 			return new(ptr) T(a_value);
 		}
 		
 		auto push_back(T&& a_value)
 		{
-			expect(m_size < MaxSize, length_error{ "Adding value in full bounded_vector." });
+			expect(m_size < MaxSize, std::length_error{ "Adding value in full bounded_vector." });
 			auto ptr = begin() + m_size++;
 			return new(ptr) T(std::forward(a_value));
 		}
@@ -111,7 +111,7 @@ namespace vob::sta
 		template <typename... Args>
 		auto emplace_back(Args&&... a_args)
 		{
-			expect(m_size < MaxSize, length_error{ "Adding value in full bounded_vector." });
+			expect(m_size < MaxSize, std::length_error{ "Adding value in full bounded_vector." });
 			auto ptr = begin() + m_size++;
 			ptr = new(ptr) T{ std::forward<Args>(a_args)... };
 			return ptr;
@@ -119,7 +119,7 @@ namespace vob::sta
 
 		auto pop_back()
 		{
-			expect(m_size > 0, length_error{ "Calling pop_back on empty bounded_vector." });
+			expect(m_size > 0, std::length_error{ "Calling pop_back on empty bounded_vector." });
 			do_pop_back();
 		}
 #pragma endregion
