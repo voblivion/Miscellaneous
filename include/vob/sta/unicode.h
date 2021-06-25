@@ -7,7 +7,6 @@
 #include <string>
 #include <string_view>
 
-#include <vob/sta/compiler.h>
 
 namespace vob::sta
 {
@@ -702,7 +701,6 @@ namespace vob::sta
     class utf8_string_view
 		: public detail::utf8_string_base<utf8_string_view, std::string_view, utf8_string_view>
     {
-#pragma STA_TODO("Some of these methods could be made constrepr")
 	public:
 		#pragma region Types
         using base = detail::utf8_string_base<utf8_string_view, std::string_view, utf8_string_view>;
