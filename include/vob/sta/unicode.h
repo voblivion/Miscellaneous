@@ -809,9 +809,8 @@ namespace vob::sta
 		)
 			: base{ string_view_type{ a_data, a_count }, a_errorHandling }
 		{}
-		template <typename T>
 		constexpr utf8_string_view(
-            T const& a_data
+            char const* a_data
             , utf8_error_handling a_errorHandling = utf8_error_handling::Stop
 		)
 			: utf8_string_view{ string_view_type(a_data), a_errorHandling }
@@ -1050,7 +1049,9 @@ namespace vob::sta
 		
 		constexpr self& erase(size_t a_pos, size_type a_count = base::npos)
 		{
-			return erase(base::begin() + a_pos, a_count);
+			auto count = std::min(a_count, m_size - a_pos);
+			erase(base::begin() + a_pos, base::begin() + a_pos + a_count);
+			return *this;
 		}
 		constexpr const_iterator erase(const_iterator a_pos)
 		{
@@ -1064,12 +1065,11 @@ namespace vob::sta
 				--m_size;
 				++it;
 			}
-            m_data.erase(a_first.raw(), a_last.raw() - a_first.raw());
+            m_data.erase(
+				a_first.raw() - base::begin().raw()
+				, a_last.raw() - a_first.raw()
+			);
             return a_first;
-		}
-		constexpr const_iterator erase(const_iterator a_first, size_type a_count)
-		{
-			return erase(a_first, a_first + a_count);
 		}
 		
 		constexpr void push_back(unicode a_code)
