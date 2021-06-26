@@ -10,12 +10,14 @@
 
 namespace vob::sta
 {
+	using char_t = char;
+
     using unicode = std::uint32_t;
 
 	struct utf8_error final
 		: std::runtime_error
     {
-        explicit utf8_error(char const* a_reason)
+        explicit utf8_error(char_t const* a_reason)
             : std::runtime_error{ a_reason }
         {}
 	};
@@ -30,7 +32,7 @@ namespace vob::sta
 	constexpr std::size_t uft8_max_size = 4;
 	constexpr unicode invalid_unicode = 0xffff;
 
-	constexpr inline std::size_t utf8_code_size(char const a_utf8Header)
+	constexpr inline std::size_t utf8_code_size(char_t const a_utf8Header)
 	{
 		std::uint8_t const h0 = a_utf8Header & 0b11110000;
 		return h0 < 0b10000000 ? 1 : (h0 < 0b11100000 ? 2 : (h0 < 0b11110000 ? 3 : 4));
@@ -60,32 +62,32 @@ namespace vob::sta
 		}
 	}
 
-	constexpr inline std::size_t utf8_write(char* a_target, unicode a_code)
+	constexpr inline std::size_t utf8_write(char_t* a_target, unicode a_code)
     {
         if (a_code <= 0x007f)
         {
-            *a_target = static_cast<char>(a_code);
+            *a_target = static_cast<char_t>(a_code);
 			return 1;
         }
         else if (a_code <= 0x07ff)
         {
-            *a_target = static_cast<char>(0b11000000 | ((a_code >> 6) & 0b00011111));
-            *++a_target = static_cast<char>(0b10000000 | (a_code & 0b00111111));
+            *a_target = static_cast<char_t>(0b11000000 | ((a_code >> 6) & 0b00011111));
+            *++a_target = static_cast<char_t>(0b10000000 | (a_code & 0b00111111));
 			return 2;
         }
         else if (a_code <= 0xffff)
         {
-            *a_target = static_cast<char>(0b11100000 | ((a_code >> 12) & 0b00001111));
-            *++a_target = static_cast<char>(0b10000000 | ((a_code >> 6) & 0b00111111));
-            *++a_target = static_cast<char>(0b10000000 | (a_code & 0b00111111));
+            *a_target = static_cast<char_t>(0b11100000 | ((a_code >> 12) & 0b00001111));
+            *++a_target = static_cast<char_t>(0b10000000 | ((a_code >> 6) & 0b00111111));
+            *++a_target = static_cast<char_t>(0b10000000 | (a_code & 0b00111111));
 			return 3;
         }
         else
         {
-            *a_target = static_cast<char>(0b11110000 | ((a_code >> 18) & 0b00000111));
-            *++a_target = static_cast<char>(0b10000000 | ((a_code >> 12) & 0b00111111));
-            *++a_target = static_cast<char>(0b10000000 | ((a_code >> 6) & 0b00111111));
-            *++a_target = static_cast<char>(0b10000000 | (a_code & 0b00111111));
+            *a_target = static_cast<char_t>(0b11110000 | ((a_code >> 18) & 0b00000111));
+            *++a_target = static_cast<char_t>(0b10000000 | ((a_code >> 12) & 0b00111111));
+            *++a_target = static_cast<char_t>(0b10000000 | ((a_code >> 6) & 0b00111111));
+            *++a_target = static_cast<char_t>(0b10000000 | (a_code & 0b00111111));
 			return 4;
         }
 	}
@@ -143,7 +145,9 @@ namespace vob::sta
 	}
 
 	template <typename AllocatorT>
-	constexpr std::size_t utf8_clean(std::basic_string<char, std::char_traits<char>, AllocatorT>& a_string)
+	constexpr std::size_t utf8_clean(
+		std::basic_string<char_t, std::char_traits<char_t>, AllocatorT>& a_string
+	)
 	{
 		std::string_view view{ a_string };
 		auto size = utf8_clean(view);
@@ -184,12 +188,14 @@ namespace vob::sta::detail
 {
 	template <typename OwnerT>
 	class utf8_const_iterator
-	{
+    {
+        using size_type = std::size_t;
 	public:
 		using iterator_category = std::bidirectional_iterator_tag;
-		using value_type = unicode;
+        using value_type = unicode;
+        using self = utf8_const_iterator;
 
-		constexpr utf8_const_iterator(char const* a_ptr)
+		constexpr utf8_const_iterator(char_t const* a_ptr)
 			: m_ptr{ a_ptr }
 		{}
 
@@ -203,26 +209,77 @@ namespace vob::sta::detail
 			m_ptr += utf8_code_size(*m_ptr);
 			return *this;
 		}
-
 		constexpr utf8_const_iterator operator++(int)
 		{
 			auto tmp = *this;
 			++*this;
 			return tmp;
 		}
-
 		constexpr utf8_const_iterator& operator--()
 		{
 			while ((*--m_ptr & 0b11000000) == 0b10000000) {}
 			return *this;
 		}
-
 		constexpr utf8_const_iterator operator--(int)
 		{
 			auto tmp = *this;
 			--*this;
 			return tmp;
 		}
+
+        constexpr self& operator+=(size_type a_offset)
+        {
+            while (a_offset-- > 0)
+            {
+                this->operator++();
+            }
+            return *this;
+        }
+        constexpr self& operator-=(size_type a_offset)
+        {
+            while (a_offset-- > 0)
+            {
+                this->operator--();
+            }
+            return *this;
+        }
+        constexpr self& operator+=(std::int64_t a_offset)
+        {
+            if (a_offset < 0)
+            {
+                return *this -= static_cast<size_type>(-a_offset);
+            }
+            return *this += static_cast<size_type>(a_offset);
+        }
+        constexpr self& operator-=(std::int64_t a_offset)
+        {
+            if (a_offset < 0)
+            {
+                return *this += static_cast<size_type>(-a_offset);
+            }
+            return *this -= static_cast<size_type>(a_offset);
+        }
+        friend constexpr self operator+(self a_lhs, size_t a_offset)
+        {
+            a_lhs += a_offset;
+            return a_lhs;
+        }
+        friend constexpr self operator-(self a_lhs, size_type a_offset)
+        {
+            a_lhs -= a_offset;
+            return a_lhs;
+        }
+        friend constexpr self operator+(self a_lhs, std::int64_t a_offset)
+        {
+            a_lhs += a_offset;
+            return a_lhs;
+        }
+        friend constexpr self operator-(self a_lhs, std::int64_t a_offset)
+        {
+            a_lhs -= a_offset;
+            return a_lhs;
+        }
+
 		constexpr auto operator<=>(utf8_const_iterator const& a_other) const
 		{
 			return m_ptr <=> a_other.m_ptr;
@@ -232,10 +289,10 @@ namespace vob::sta::detail
 			return m_ptr == a_other.m_ptr;
 		}
 
-		char const* raw() { return m_ptr; }
+		char_t const* raw() { return m_ptr; }
 
 	private:
-		char const* m_ptr;
+		char_t const* m_ptr;
 	};
 
 	template <typename OwnerT>
@@ -244,8 +301,10 @@ namespace vob::sta::detail
     public:
         using iterator_category = std::bidirectional_iterator_tag;
         using value_type = unicode;
-
-		constexpr utf8_const_reverse_iterator(char const* a_ptr)
+		using size_type = std::size_t;
+		using self = utf8_const_reverse_iterator;
+		
+		constexpr utf8_const_reverse_iterator(char_t const* a_ptr)
             : m_ptr{ a_ptr }
         {}
 
@@ -261,26 +320,77 @@ namespace vob::sta::detail
             while ((*--m_ptr & 0b11000000) == 0b10000000) {}
 			return *this;
         }
-
 		constexpr utf8_const_reverse_iterator operator++(int)
         {
             auto tmp = *this;
             ++* this;
             return tmp;
         }
-
 		constexpr utf8_const_reverse_iterator& operator--()
         {
             m_ptr += utf8_code_size(*m_ptr);
             return *this;
         }
-
 		constexpr utf8_const_reverse_iterator operator--(int)
         {
             auto tmp = *this;
             --* this;
             return tmp;
         }
+
+		constexpr self& operator+=(size_type a_offset)
+		{
+			while (a_offset-- > 0)
+			{
+				this->operator++();
+			}
+			return this->operator--();
+        }
+        constexpr self& operator-=(size_type a_offset)
+        {
+            while (a_offset-- > 0)
+            {
+                *this--;
+            }
+            return *this;
+        }
+		constexpr self& operator+=(std::int64_t a_offset)
+		{
+			if (a_offset < 0)
+			{
+				return *this -= static_cast<size_type>(-a_offset);
+			}
+			return *this += static_cast<size_type>(a_offset);
+        }
+        constexpr self& operator-=(std::int64_t a_offset)
+        {
+            if (a_offset < 0)
+            {
+                return *this += static_cast<size_type>(-a_offset);
+            }
+            return *this -= static_cast<size_type>(a_offset);
+        }
+        friend constexpr self operator+(self a_lhs, size_t a_offset)
+        {
+            a_lhs += a_offset;
+            return a_lhs;
+        }
+        friend constexpr self operator-(self a_lhs, size_type a_offset)
+        {
+            a_lhs -= a_offset;
+            return a_lhs;
+        }
+        friend constexpr self operator+(self a_lhs, std::int64_t a_offset)
+        {
+            a_lhs += a_offset;
+            return a_lhs;
+        }
+        friend constexpr self operator-(self a_lhs, std::int64_t a_offset)
+        {
+            a_lhs -= a_offset;
+            return a_lhs;
+        }
+
         constexpr auto operator<=>(utf8_const_reverse_iterator const& a_other) const
         {
             return m_ptr <=> a_other.m_ptr;
@@ -291,7 +401,7 @@ namespace vob::sta::detail
         }
 
     private:
-        char const* m_ptr;
+        char_t const* m_ptr;
 	};
 
 	template <typename DerivedT, typename StorageT, typename Utf8StringViewT>
@@ -300,7 +410,7 @@ namespace vob::sta::detail
 	public:
 		#pragma region Types
 		using self = DerivedT;
-        using traits_type = std::char_traits<char>;
+        using traits_type = std::char_traits<char_t>;
 		using value_type = unicode;
 		using size_type = std::size_t;
 		using const_iterator = utf8_const_iterator<self>;
@@ -360,7 +470,7 @@ namespace vob::sta::detail
         }
 		constexpr bool contains(unicode a_code) const
         {
-            return find(a_code, begin()) != npos;
+            return find(a_code) != npos;
         }
         constexpr bool contains(self const& a_string) const
         {
@@ -388,33 +498,29 @@ namespace vob::sta::detail
         }
 		constexpr self substr(size_type a_pos = 0, size_type a_count = npos) const
         {
-            if (a_pos >= m_size)
+            if (a_pos > m_size)
             {
                 throw std::out_of_range("invalid utf8_string position");
             }
-            auto it = iterator_at(a_pos);
-            return substr(it, a_count);
+            return substr(begin() + a_pos, std::min(m_size - a_pos, a_count));
+        }
+        constexpr self substr(const_iterator a_first, size_type a_count) const
+        {
+			auto last = a_first + a_count;
+			return self{
+				m_data.substr(a_first.raw() - m_data.data(), last.raw() - a_first.raw())
+				, a_count
+			};
         }
 		constexpr self substr(const_iterator a_first, const_iterator a_last) const
         {
-            self sub;
-            sub.m_data.reserve(a_last.raw() - a_first.raw());
-            while (a_first != a_last)
-            {
-                sub.push_back(*a_first++);
-            }
-            return sub;
-        }
-		constexpr self substr(const_iterator a_first, size_type a_count) const
-        {
-            self sub;
-            sub.m_data.reserve(std::min(a_count * uft8_max_size, end().raw() - a_first.raw()));
-            for (auto i = 0; i < a_count; ++i)
-            {
-                sub.push_back(*a_first);
-                ++a_first;
-            }
-            return sub;
+			auto count = 0;
+			for (auto it = a_first; it != a_last && it != end(); ++it, ++count) {}
+
+			return self{
+				m_data.substr(a_first.raw() - m_data.data(), a_last.raw() - a_first.raw())
+				, count
+			};
         }
 		#pragma endregion
 		
@@ -653,44 +759,17 @@ namespace vob::sta::detail
 		}
 		constexpr value_type operator[](size_type a_pos) const
 		{
-			return *iterator_at(a_pos);
+			return *(begin() + a_pos);
 		}
 		#pragma endregion
 		
 	protected:
-		#pragma region Helpers
-        const_iterator iterator_add(const_iterator a_it, size_type a_count)
-        {
-            while (a_it != end() && a_count-- > 0)
-            {
-                ++a_it;
-            }
-            return a_it;
-        }
-        const_iterator iterator_remove(const_iterator a_it, size_t a_count)
-        {
-            while (a_it != begin() && a_count-- > 0)
-            {
-                --a_it;
-            }
-            return a_it;
-        }
-        const_iterator iterator_at(size_type a_pos)
-        {
-            if (a_pos >= m_size)
-            {
-                throw std::out_of_range("invalid utf8_string position");
-            }
-            return iterator_add(begin(), a_pos);
-        }
-		#pragma endregion
-
         StorageT m_data;
         size_type m_size = 0;
 
-		constexpr utf8_string_base(StorageT a_view, size_type a_unicodeCount)
+		constexpr utf8_string_base(StorageT a_data, size_type a_unicodeCount)
             : m_size{ a_unicodeCount }
-            , m_data{ a_view }
+            , m_data{ a_data }
         {
         }
 	};
@@ -713,10 +792,42 @@ namespace vob::sta
         constexpr utf8_string_view() = default;
 		constexpr utf8_string_view(
 			string_view_type a_view
+			, size_type a_size
+		)
+			: base{ a_view, a_size }
+		{}
+		constexpr utf8_string_view(
+			string_view_type a_view
 			, utf8_error_handling a_errorHandling = utf8_error_handling::Stop
 		)
 			: base{ a_view, a_errorHandling }
 		{}
+		constexpr utf8_string_view(
+			char_t const* a_data
+			, size_type a_count
+			, utf8_error_handling a_errorHandling = utf8_error_handling::Stop
+		)
+			: base{ string_view_type{ a_data, a_count }, a_errorHandling }
+		{}
+		template <typename T>
+		constexpr utf8_string_view(
+            T const& a_data
+            , utf8_error_handling a_errorHandling = utf8_error_handling::Stop
+		)
+			: utf8_string_view{ string_view_type(a_data), a_errorHandling }
+        {}
+        template <typename T>
+        constexpr utf8_string_view(
+            T const& a_data
+            , size_type a_pos
+            , size_type a_count
+            , utf8_error_handling a_errorHandling = utf8_error_handling::Stop
+        )
+            : utf8_string_view{ string_view_type{ a_data }, a_errorHandling }
+        {
+            // TODO: optimize to only read what is necessary
+            m_data = m_data.substr(a_pos, a_count);
+        }
 		#pragma endregion
 
 		#pragma region Mutators
@@ -749,21 +860,13 @@ namespace vob::sta
 			m_data.remove_suffix(rawOffset);
         }
 		#pragma endregion
-
-	private:
-        template <typename> friend class utf8_basic_string;
-
-        utf8_string_view(string_view_type a_view, size_type a_unicodeCount)
-            : base{ a_view, a_unicodeCount }
-        {
-        }
     };
 
-	template <typename AllocatorT = std::allocator<char>>
+	template <typename AllocatorT = std::allocator<char_t>>
 	class utf8_basic_string
 		: public detail::utf8_string_base<
 			utf8_basic_string<AllocatorT>
-			, std::basic_string<char, std::char_traits<char>, AllocatorT>
+			, std::basic_string<char_t, std::char_traits<char_t>, AllocatorT>
 			, utf8_string_view
 		>
     {
@@ -771,11 +874,11 @@ namespace vob::sta
 		#pragma region Types
 		using base = detail::utf8_string_base<
 			utf8_basic_string<AllocatorT>
-			, std::basic_string<char, std::char_traits<char>, AllocatorT>
+			, std::basic_string<char_t, std::char_traits<char_t>, AllocatorT>
 			, utf8_string_view
 		>;
 		using allocator_type = AllocatorT;
-		using string_type = std::basic_string<char, std::char_traits<char>, allocator_type>;
+		using string_type = std::basic_string<char_t, std::char_traits<char_t>, allocator_type>;
 
 		using string_view_type = base::string_view_type;
 		using size_type = base::size_type;
@@ -790,7 +893,12 @@ namespace vob::sta
 		)
 			: base{ string_type{ a_allocator } }
 		{}
-
+        constexpr utf8_basic_string(
+            string_type a_string
+            , size_type a_size
+        )
+            : base{ std::move(a_string), a_size }
+        {}
         constexpr utf8_basic_string(
             string_type a_string
             , utf8_error_handling a_errorHandling = utf8_error_handling::Stop
@@ -814,7 +922,14 @@ namespace vob::sta
         )
 			: base{ string_type{ a_view.data(), a_allocator }, a_view.size() }
         {}
-
+        constexpr utf8_basic_string(
+            char_t const* a_data
+            , size_type a_count
+            , allocator_type const& a_allocator = allocator_type{}
+            , utf8_error_handling a_errorHandling = utf8_error_handling::Stop
+        )
+            : base{ string_type{ a_data, a_count }, a_errorHandling }
+        {}
 		template <typename T>
 		constexpr utf8_basic_string(
 			T const& a_data
@@ -826,20 +941,6 @@ namespace vob::sta
 				, a_allocator
 			}
 		{}
-
-		template <typename T>
-        constexpr utf8_basic_string(
-            T const& a_data
-            , size_type a_count
-            , allocator_type const& a_allocator = allocator_type{}
-            , utf8_error_handling a_errorHandling = utf8_error_handling::Stop
-        )
-			: utf8_basic_string{
-				utf8_string_view{ a_data, a_errorHandling }.substr(0, a_count)
-				, a_allocator
-			}
-        {}
-
 		template <typename T>
 		constexpr utf8_basic_string(
 			T const& a_data
@@ -849,7 +950,7 @@ namespace vob::sta
             , utf8_error_handling a_errorHandling = utf8_error_handling::Stop
 		)
 			: utf8_basic_string{
-				utf8_string_view{ a_data, a_errorHandling }.substr(a_pos, a_count)
+				utf8_string_view{ a_data, a_pos, a_count, a_errorHandling }
 				, a_allocator
 			}
 		{}
@@ -910,11 +1011,11 @@ namespace vob::sta
 
 		constexpr self& insert(size_t a_pos, unicode a_char)
 		{
-			return insert(base::iterator_at(a_pos), a_char);
+			return insert(base::begin() + a_pos, a_char);
 		}
 		constexpr self& insert(const_iterator a_pos, unicode a_code)
 		{
-			std::array<char, 4> utf8char;
+			std::array<char_t, 4> utf8char;
 			auto charSize = utf8_write(utf8char.data(), a_code);
 			m_data.insert(a_pos.raw() - m_data.data(), utf8char.data(), charSize);
 			++m_size;
@@ -922,7 +1023,7 @@ namespace vob::sta
 		}
 		constexpr self& insert(size_t a_pos, utf8_string_view a_str)
 		{
-			return insert(base::iterator_at(a_pos));
+			return insert(base::begin() + a_pos);
 		}
 		constexpr self& insert(const_iterator a_pos, utf8_string_view a_str)
 		{
@@ -949,11 +1050,11 @@ namespace vob::sta
 		
 		constexpr self& erase(size_t a_pos, size_type a_count = base::npos)
 		{
-			return erase(base::iterator_at(a_pos), a_count);
+			return erase(base::begin() + a_pos, a_count);
 		}
 		constexpr const_iterator erase(const_iterator a_pos)
 		{
-			return erase(a_pos, iterator_add(a_pos, 1));
+			return erase(a_pos, a_pos + 1);
 		}
 		constexpr const_iterator erase(const_iterator a_first, const_iterator a_last)
         {
@@ -968,7 +1069,7 @@ namespace vob::sta
 		}
 		constexpr const_iterator erase(const_iterator a_first, size_type a_count)
 		{
-			return erase(a_first, iterator_add(a_first, a_count));
+			return erase(a_first, a_first + a_count);
 		}
 		
 		constexpr void push_back(unicode a_code)
@@ -1015,9 +1116,14 @@ namespace vob::sta
 		#pragma endregion
 
 		#pragma region Operators
-		constexpr operator utf8_string_view()
+		constexpr operator utf8_string_view() const
 		{
 			return utf8_string_view{ m_data, m_size };
+		}
+		friend self operator+(self a_lhs, self const& a_rhs)
+		{
+			a_lhs.append(a_rhs);
+			return a_lhs;
 		}
 		#pragma endregion
 
