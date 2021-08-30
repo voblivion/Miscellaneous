@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cassert>
+#include <cmath>
 #include <compare>
 #include <stdexcept>
 #include <string>
@@ -259,16 +260,6 @@ namespace vob::sta::detail
             }
             return *this -= static_cast<size_type>(a_offset);
         }
-        friend constexpr self operator+(self a_lhs, size_t a_offset)
-        {
-            a_lhs += a_offset;
-            return a_lhs;
-        }
-        friend constexpr self operator-(self a_lhs, size_type a_offset)
-        {
-            a_lhs -= a_offset;
-            return a_lhs;
-        }
         friend constexpr self operator+(self a_lhs, std::int64_t a_offset)
         {
             a_lhs += a_offset;
@@ -369,16 +360,6 @@ namespace vob::sta::detail
                 return *this += static_cast<size_type>(-a_offset);
             }
             return *this -= static_cast<size_type>(a_offset);
-        }
-        friend constexpr self operator+(self a_lhs, size_t a_offset)
-        {
-            a_lhs += a_offset;
-            return a_lhs;
-        }
-        friend constexpr self operator-(self a_lhs, size_type a_offset)
-        {
-            a_lhs -= a_offset;
-            return a_lhs;
         }
         friend constexpr self operator+(self a_lhs, std::int64_t a_offset)
         {
@@ -514,7 +495,7 @@ namespace vob::sta::detail
         }
 		constexpr self substr(const_iterator a_first, const_iterator a_last) const
         {
-			auto count = 0;
+			size_type count = 0;
 			for (auto it = a_first; it != a_last && it != end(); ++it, ++count) {}
 
 			return self{
@@ -609,20 +590,34 @@ namespace vob::sta::detail
 			return npos;
 		}
 
+		constexpr size_type find_first_of(
+			Utf8StringViewT a_str
+			, const_iterator a_searchStart
+			, const_iterator a_searchEnd
+		) const
+        {
+            auto pos = npos;
+            while (a_searchStart != a_searchEnd)
+            {
+                ++pos;
+                if (a_str.contains(*a_searchStart))
+                {
+                    return pos;
+                }
+                ++a_searchStart;
+            }
+            return npos;
+        }
+        constexpr size_type find_first_of(
+			Utf8StringViewT a_str
+            , const_iterator a_searchStart
+        ) const
+        {
+			return find_first_of(a_str, a_searchStart, end());
+        }
 		constexpr size_type find_first_of(Utf8StringViewT a_str) const
 		{
-			auto pos = npos;
-			auto it = begin();
-			while (it != end())
-			{
-				++pos;
-				if (a_str.contains(*it))
-				{
-					return pos;
-				}
-				++it;
-			}
-			return npos;
+			return find_first_of(a_str, begin());
 		}
 		constexpr size_type find_first_of(
 			string_view_type a_str
