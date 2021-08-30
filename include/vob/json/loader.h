@@ -179,6 +179,7 @@ namespace vob::json
 				if (a_is.get() != 'r') { set_error(a_is, load_error::bad_boolean_format); return; }
 				if (a_is.get() != 'u') { set_error(a_is, load_error::bad_boolean_format); return; }
 				if (a_is.get() != 'e') { set_error(a_is, load_error::bad_boolean_format); return; }
+				a_boolean = true;
 			}
 			else
 			{
@@ -186,6 +187,7 @@ namespace vob::json
 				if (a_is.get() != 'l') { set_error(a_is, load_error::bad_boolean_format); return; }
 				if (a_is.get() != 's') { set_error(a_is, load_error::bad_boolean_format); return; }
 				if (a_is.get() != 'e') { set_error(a_is, load_error::bad_boolean_format); return; }
+				a_boolean = false;
 			}
 		}
 
