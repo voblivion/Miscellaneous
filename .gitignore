@@ -3,11 +3,10 @@
 ################################################################################
 
 /x64
-/.vs/vob/v15
+/.vs
 /vobcpp.vcxproj.user
 /vobcpp.vcxproj.filters
 /vobcpp.vcxproj
 /vobcpp.sln
 /test.cpp
-/.vs/vobcpp/v15
 *.suo
