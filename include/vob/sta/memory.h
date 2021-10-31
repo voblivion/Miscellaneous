@@ -17,7 +17,7 @@ namespace vob::sta
 			template <typename... Args>
 			polymorphic_block(AllocatorType a_allocator, Args&&... a_args)
 				: m_allocator{ std::move(a_allocator) }
-				, m_object{ std::forward<Args>(a_args) }
+				, m_object{ std::forward<Args>(a_args)... }
 			{}
 
 			void destroy() override
@@ -28,14 +28,29 @@ namespace vob::sta
 				auto allocator = BlockAllocator{ m_allocator };
 				allocator.deallocate(this, 1);
 			}
+
+			Type m_object;
+			AllocatorType m_allocator;
 		};
 
 		struct polymorphic_deleter
 		{
-			void operator(void* a_ptr)
+			polymorphic_deleter() = default;
+
+			explicit polymorphic_deleter(a_polymorphic_block* a_block)
+				: m_block{ a_block }
+			{}
+
+			void operator()(void* a_ptr)
 			{
-				(static_cast<a_polymorphic_block*>(a_ptr) - 1)->destroy();
+				assert((a_ptr != nullptr) == (m_block != nullptr));
+				if (m_block != nullptr)
+				{
+					m_block->destroy();
+				}
 			}
+
+			a_polymorphic_block* m_block = nullptr;
 		};
 	}
 
@@ -43,7 +58,7 @@ namespace vob::sta
 	using polymorphic_ptr = std::unique_ptr<Type, detail::polymorphic_deleter>;
 
 	template <typename Type, typename AllocatorType, typename... Args>
-	PolymorphicPtr<Type> allocatePolymorphic(AllocatorType a_allocator, Args&&... a_args)
+	polymorphic_ptr<Type> allocate_polymorphic(AllocatorType a_allocator, Args&&... a_args)
 	{
 		using Block = detail::polymorphic_block<Type, AllocatorType>;
 		using BlockAllocator = typename std::allocator_traits<AllocatorType>::template rebind_alloc<Block>;
@@ -51,6 +66,18 @@ namespace vob::sta
 
 		auto block = allocator.allocate(1);
 		::new (block) Block(a_allocator, std::forward<Args>(a_args)...);
-		return PolymorphicPtr<Type>{ &block->m_object };
+		return polymorphic_ptr<Type>{ &block->m_object, detail::polymorphic_deleter{ block } };
+	}
+
+	template <typename Type, typename BaseType>
+	polymorphic_ptr<Type> polymorphic_pointer_cast(polymorphic_ptr<BaseType>& a_ptr)
+	{
+		return polymorphic_ptr<Type>{ static_cast<Type*>(a_ptr.release()), std::move(a_ptr.get_deleter()) };
+	}
+
+	template <typename Type, typename BaseType>
+	polymorphic_ptr<Type> polymorphic_pointer_cast(polymorphic_ptr<BaseType>&& a_ptr)
+	{
+		return polymorphic_ptr<Type>{ static_cast<Type*>(a_ptr.release()), std::move(a_ptr.get_deleter()) };
 	}
 }
