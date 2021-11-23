@@ -1,11 +1,11 @@
-Some c++ stuff that could be standard but are not.
+Some usefull c++ stuff.
 
-## Dependencies
+## Packages
 
-- std : *none*
+- std : *no dependency* - a set of containers, strings, stream manipulators, etc. that could almost belong to c++ standard library.
 
-- physics : *none*
+- physics : *no dependency* - to work with strongly typed arithmetic values representing physic meatures (for instance not to add a length and a duration).
 
-- type : std
+- hash : *requires std* - hash related features (for instance string_id to obtain a compile-time integer-like object from a string literal).
 
-- hash : std
+- type : *requires hash & std* - to dynamic types utilities (for instance to create them from some register identifier).
