@@ -10,7 +10,10 @@
 
 namespace vob::misty
 {
-	/// @brief TODO
+	/// @brief A templated class to handle the copy of an unknown polymorphic pointer.
+	/// @tparam TPolymorphicBase base class from which all registered types will be based.
+	/// @tparam TAllocator allocator used to store the inner logic of cloner_copier.
+	/// @tparam TCloneAllocator allocator used to allocate new copy of provided polymorphic objects.
 	template <
 		typename TPolymorphicBase,
 		typename TCloneAllocator = std::allocator<char>,
@@ -18,12 +21,10 @@ namespace vob::misty
 	class clone_copier
 	{
 #pragma region PRIVATE_TYPES
-		/// @brief TODO
+		/// @brief An operator class that allocates a copy of a provided source.
 		template <typename TValue>
-		class clone_op
+		struct clone_op
 		{
-		public:
-			/// @brief TODO
 			void operator()(
 				TValue const& a_source,
 				mistd::polymorphic_ptr<TPolymorphicBase>& a_target,
@@ -36,8 +37,11 @@ namespace vob::misty
 
 	public:
 #pragma region CREATORS
-		/// @brief TODO
-		explicit clone_copier(TCloneAllocator a_cloneAllocator = {}, TAllocator const& a_allocator = {})
+		/// @brief Creates a clone_copier from the 2 allocators used by cloner_copier.
+		///
+		/// @param a_allocator allocator used to store the inner logic of cloner_copier.
+		/// @param a_cloneAllocator allocator used to allocate new copy of provided polymorphic objects.
+		explicit clone_copier(TAllocator const& a_allocator = {}, TCloneAllocator a_cloneAllocator = {})
 			: m_cloneAllocator{ a_cloneAllocator }
 			, m_applicator{ a_allocator }
 		{}
@@ -47,7 +51,7 @@ namespace vob::misty
 		/// @brief TODO
 		template <typename TValue>
 		requires std::is_base_of_v<TPolymorphicBase, TValue>
-		mistd::polymorphic_ptr<TValue> clone(mistd::polymorphic_ptr<TValue> const& a_source) const
+		[[nodiscard]] mistd::polymorphic_ptr<TValue> clone(mistd::polymorphic_ptr<TValue> const& a_source) const
 		{
 			if (a_source == nullptr)
 			{
@@ -59,24 +63,26 @@ namespace vob::misty
 			return mistd::polymorphic_ptr_util::cast<TValue>(std::move(target));
 		}
 
-		/// @brief TODO
+		/// @brief allocates a TValue instance from provided arguments using clone-allocator this clone_copier
+		/// was constructed with.
 		template <typename TValue, typename... TArgs>
-		auto create(TArgs&&... a_args) const
+		[[nodiscard]] auto create(TArgs&&... a_args) const
 		{
 			return mistd::polymorphic_ptr_util::allocate<TValue>(m_cloneAllocator, std::forward<TArgs>(a_args)...);
 		}
 
-		/// @brief TODO
+		/// @brief Returns whether or not a type has been registered to be cloned by this clone_copier.
 		template <typename TValue>
 		requires std::is_base_of_v<TPolymorphicBase, TValue>
-		bool is_registered() const
+		[[nodiscard]] bool is_registered() const
 		{
 			return m_applicator.template is_registered<TValue>();
 		}
 #pragma endregion
 
 #pragma region MANIPULATORS
-		/// @brief TODO
+		/// @brief Registers a type to be later handled by this clone_copier when passed a polymorphic object of that
+		/// type.
 		template <typename TValue>
 		requires std::is_base_of_v<TPolymorphicBase, TValue>
 		void register_type()
@@ -101,12 +107,12 @@ namespace vob::misty
 
 	namespace pmr
 	{
-		/// @brief TODO
+		/// @brief A basic clone_copier using C++'s polymorphic allocator.
 		template <typename TPolymorphicBase>
 		using clone_copier = misty::clone_copier<TPolymorphicBase, std::pmr::polymorphic_allocator<char>>;
 	}
 
-	/// @brief TODO
+	/// @brief A templated class to represent a polymorphic object that can be cloned thanks to a clone_copier.
 	template <
 		typename TValue,
 		typename TPolymorphicBase,
@@ -115,21 +121,19 @@ namespace vob::misty
 	{
 	public:
 #pragma region CREATORS
-		/// @brief TODO
+		/// @brief Creates a clone instance from the clone copier used to perform its copy.
 		explicit clone(TCloneCopier const& a_copier)
 			: m_copier{ a_copier }
 		{}
 
-		/// @brief TODO
 		clone(clone&&) = default;
 
-		/// @brief TODO
+		/// @brief Copies a clone instance by allocating a deep copy of its internal value.
 		clone(clone const& a_other)
 			: m_copier{ a_other.m_copier }
 			, m_value{ m_copier.get().clone(a_other.m_value) }
 		{}
 
-		/// @brief TODO
 		~clone()
 		{
 			reset();
@@ -137,71 +141,73 @@ namespace vob::misty
 #pragma endregion
 
 #pragma region ACCESSORS
-		/// @brief TODO
-		TValue const* get() const
+		/// @brief Provides a const pointer to the polymorphic type stored in this clone instance.
+		[[nodiscard]] TValue const* get() const
 		{
 			return m_value.get();
 		}
 
-		/// @brief TODO
-		TValue const* operator->() const
+		/// @brief Provides a const pointer to the polymorphic type stored in this clone instance.
+		[[nodiscard]] TValue const* operator->() const
 		{
 			return m_value.get();
 		}
 
-		/// @brief TODO
-		TValue const& operator*() const
+		/// @brief Provides a const reference to the polymorphic type stored in this clone instance.
+		[[nodiscard]] TValue const& operator*() const
 		{
 			return *m_value;
 		}
 
-		/// @brief TODO
-		bool operator==(std::nullptr_t) const
+		/// @brief Performs the pointer-like == comparison of two clone instances.
+		[[nodiscard]] bool operator==(std::nullptr_t) const
 		{
 			return m_value == nullptr;
 		}
 
-		/// @brief TODO
-		bool operator!=(std::nullptr_t) const
+		/// @brief Performs the pointer-like != comparison of two clone instance.
+		[[nodiscard]] bool operator!=(std::nullptr_t) const
 		{
 			return m_value == nullptr;
 		}
 #pragma endregion
 
 #pragma region MANIPULATORS
-		/// @brief TODO
-		TValue* get()
+		/// @brief Provides a pointer to the polymorphic type stored in this clone instance.
+		[[nodiscard]] TValue* get()
 		{
 			return m_value.get();
 		}
 
-		/// @brief TODO
-		TValue* operator->()
+		/// @brief Provides a pointer to the polymorphic type stored in this clone instance.
+		[[nodiscard]] TValue* operator->()
 		{
 			return m_value.get();
 		}
 
-		/// @brief TODO
-		TValue& operator*()
+		/// @brief Provides a reference to the polymorphic type stored in this clone instance.
+		[[nodiscard]] TValue& operator*()
 		{
 			return *m_value;
 		}
 
-		/// @brief TODO
+		/// @brief Resets this clone instance, setting its internal pointer to null.
 		void reset()
 		{
 			m_value.reset();
 		}
 
-		/// @brief TODO
+		/// @brief Resets this clone instance by setting its internal pointer to provided one.
 		template <typename TValue2>
+		requires std::is_base_of_v<TValue, TValue2>
 		void reset(mistd::polymorphic_ptr<TValue2> a_value)
 		{
 			m_value = std::move(a_value);
 		}
 
-		/// @brief TODO
+		/// @brief Resets this clone instance by allocating a new instance of provided type with
 		template <typename TValue2, typename... TArgs>
+		requires std::is_base_of_v<TValue, TValue2>
 		TValue2& init(TArgs&&... a_args)
 		{
 			m_value = m_copier.get().template create<TValue2>(std::forward<TArgs>(a_args)...);
@@ -218,8 +224,9 @@ namespace vob::misty
 
 	namespace pmr
 	{
-		/// @brief TODO
-		template <typename TValue, typename TPolymorphicBase>
-		using clone = misty::clone<TValue, TPolymorphicBase, pmr::clone_copier<TPolymorphicBase>>;
+		/// @brief A clone using C++'s polymorphic allocator.
+		template <
+			typename TValue, typename TPolymorphicBase, typename TCloneCopier = pmr::clone_copier<TPolymorphicBase>>
+		using clone = misty::clone<TValue, TPolymorphicBase, TCloneCopier>;
 	}
 }
