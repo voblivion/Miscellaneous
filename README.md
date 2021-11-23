@@ -1,9 +1,11 @@
-# sta
-Some c++ stuff that could be standard but are not (yet)
+Some c++ stuff that could be standard but are not.
 
 ## Dependencies
 
-- sta : *none*
+- std : *none*
 
-- img :
-  - sta
+- physics : *none*
+
+- type : std
+
+- hash : std
