@@ -132,7 +132,6 @@ namespace vob::misty
 			return find_id(typeid(*a_ptr));
 		}
 
-		/// @brief TODO
 		/// @brief Safely casts a std::shared_pointer to provided type if hierarchy is known by the registry.
 		template <typename TDerived, typename TBase>
 		[[nodiscard]] auto fast_cast(std::shared_ptr<TBase> const& a_ptr) const -> std::shared_ptr<TDerived>
@@ -220,12 +219,12 @@ namespace vob::misty
 #pragma endregion
 	};
 
-	/// @brief TODO
+	/// @brief A basic_registry using C++'s default allocator.
 	using registry = basic_registry<std::allocator<char>>;
 
 	namespace pmr
 	{
-		/// @brief TODO
+		/// @brief A basic_registry using C++'s polymorphic allocator.
 		using registry = basic_registry<std::pmr::polymorphic_allocator<char>>;
 	}
 }
