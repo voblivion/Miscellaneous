@@ -115,8 +115,7 @@ namespace vob::misty
 	/// @brief A templated class to represent a polymorphic object that can be cloned thanks to a clone_copier.
 	template <
 		typename TValue,
-		typename TPolymorphicBase,
-		typename TCloneCopier = clone_copier<TPolymorphicBase>>
+		typename TCloneCopier = clone_copier<TValue>>
 	class clone
 	{
 	public:
@@ -168,7 +167,7 @@ namespace vob::misty
 		/// @brief Performs the pointer-like != comparison of two clone instance.
 		[[nodiscard]] bool operator!=(std::nullptr_t) const
 		{
-			return m_value == nullptr;
+			return m_value != nullptr;
 		}
 #pragma endregion
 
@@ -213,6 +212,18 @@ namespace vob::misty
 			m_value = m_copier.get().template create<TValue2>(std::forward<TArgs>(a_args)...);
 			return static_cast<TValue2&>(*m_value);
 		}
+
+		clone& operator=(clone&& a_other)
+		{
+			m_value = std::move(a_other.m_value);
+			return *this;
+		}
+
+		clone& operator=(clone const& a_other)
+		{
+			m_value = m_copier.get().clone(a_other.m_value);
+			return *this;
+		}
 #pragma endregion
 
 	private:
@@ -225,8 +236,7 @@ namespace vob::misty
 	namespace pmr
 	{
 		/// @brief A clone using C++'s polymorphic allocator.
-		template <
-			typename TValue, typename TPolymorphicBase, typename TCloneCopier = pmr::clone_copier<TPolymorphicBase>>
-		using clone = misty::clone<TValue, TPolymorphicBase, TCloneCopier>;
+		template <typename TValue, typename TCloneCopier = pmr::clone_copier<TValue>>
+		using clone = misty::clone<TValue, TCloneCopier>;
 	}
 }

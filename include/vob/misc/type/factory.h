@@ -182,7 +182,7 @@ namespace vob::misty
 
 		/// @brief TODO
 		template <typename TValue>
-		mistd::polymorphic_ptr<TValue> create_shared(mishs::string_id const a_id) const
+		std::shared_ptr<TValue> create_shared(mishs::string_id const a_id) const
 		{
 			auto typeIndex = m_registry.find_type_index(a_id);
 			return typeIndex != nullptr ? create_shared<TValue>(*typeIndex) : nullptr;

@@ -34,12 +34,12 @@ namespace vob::misty
 #pragma endregion
 
 #pragma region PRIVATE_CLASS_DATA
-		constexpr std::size_t void_type_index = 0;
+		static constexpr std::size_t void_type_index = 0;
 #pragma region
 
 	public:
 #pragma region CLASS_DATA
-		constexpr mishs::string_id void_type_id = 0;
+		static constexpr mishs::string_id void_type_id = mishs::string_id{ 0 };
 #pragma endregion
 
 #pragma region CREATORS
@@ -47,11 +47,11 @@ namespace vob::misty
 		explicit basic_registry(TAllocator const& a_allocator = {})
 			: m_typeData{ type_data_map_allocator{ a_allocator } }
 			, m_idToTypeIndex{ type_data_map_allocator{ a_allocator } }
-			, m_hierarchy{ hierarchy_node_allocator{ a_allocator } }
+			, m_hierarchy{ hierarchy_allocator{ a_allocator } }
 		{
 			m_typeData.emplace(typeid(void), type_data{ void_type_id, void_type_index });
 			m_idToTypeIndex.emplace(0, typeid(void));
-			m_hierarchy.emplace_back(hierarchy_node{ typeid(void), void_type_index });
+			m_hierarchy.emplace_back(void_type_index);
 		}
 #pragma endregion
 
@@ -111,7 +111,7 @@ namespace vob::misty
 		{
 			assert(is_registered(a_typeIndex));
 			auto it = m_typeData.find(a_typeIndex);
-			return it != m_typeData.end() ? it->second.m_id : void_type_id;
+			return it != m_typeData.end() ? it->second.id : void_type_id;
 		}
 
 		/// @brief Finds the registered id associated to the type of a provided type.
@@ -213,7 +213,7 @@ namespace vob::misty
 			}
 			else
 			{
-				return is_base_of_impl(a_baseTypeIndex, m_hierarchy[a_derivedTypeIndex].base_index);
+				return is_base_of_impl(a_baseTypeIndex, m_hierarchy[a_derivedTypeIndex]);
 			}
 		}
 #pragma endregion
