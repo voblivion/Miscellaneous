@@ -31,7 +31,7 @@ namespace vob::mistd
 			: m_stringView{ a_stringView }
 		{}
 
-		basic_string_map_key(basic_string_map_key&& a_other)
+		basic_string_map_key(basic_string_map_key&& a_other) noexcept
 			: m_string{
 				a_other.m_string.data() == a_other.m_stringView.data()
 				? std::move(a_other.m_string) : a_other.m_stringView }

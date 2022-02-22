@@ -2,6 +2,9 @@
 
 #include "fnv1a.h"
 
+#include "../std/bounded_string.h"
+
+#include <string>
 #include <string_view>
 
 #ifndef VOB_MISHS_STRING_ID_DEBUG
@@ -14,7 +17,6 @@
 
 #if VOB_MISHS_STRING_ID_DEBUG
 #include <optional>
-#include "../std/bounded_string.h"
 #endif
 
 
@@ -31,7 +33,8 @@ namespace vob::mishs
 		constexpr explicit basic_string_id(std::basic_string_view<TChar, TCharTraits> a_string = {})
 			: m_id{ fnv1a(a_string) }
 #if VOB_MISHS_STRING_ID_DEBUG
-			, m_debug{ a_string }
+			, m_isDebugTruncated{ a_string.size() > s_debugMaxSize }
+			, m_debug{ std::move(a_string) }
 #endif
 		{}
 
@@ -43,7 +46,7 @@ namespace vob::mishs
 
 #pragma region ACCESSORS
 		/// @brief Provides the std::uint64_t representation of the basic_string_id.
-		constexpr auto get_id() const
+		[[nodiscard]] constexpr auto get_id() const
 		{
 			return m_id;
 		}
@@ -53,6 +56,25 @@ namespace vob::mishs
 		{
 			return get_id();
 		}
+
+#if VOB_MISHS_STRING_ID_DEBUG
+		/// @brief TODO
+		[[nodiscard]] constexpr auto get_debug() const
+		{
+			std::optional<std::basic_string_view<TChar, TCharTraits>> debug = std::nullopt;
+			if (m_debug != std::nullopt)
+			{
+				debug = m_debug->get_string_view();
+			}
+			return debug;
+		}
+
+		/// @brief TODO
+		[[nodiscard]] constexpr bool is_debug_truncated() const
+		{
+			return m_isDebugTruncated;
+		}
+#endif
 #pragma endregion
 
 #pragma region MANIPULATORS
@@ -61,6 +83,7 @@ namespace vob::mishs
 		{
 			m_id = a_id;
 #if VOB_MISHS_STRING_ID_DEBUG
+			m_isDebugTruncated = true;
 			m_debug = std::nullopt;
 #endif
 		}
@@ -70,16 +93,22 @@ namespace vob::mishs
 		{
 			m_id = fnv1a(a_string);
 #if VOB_MISHS_STRING_ID_DEBUG
-			m_debug = std::basic_string<TChar, TCharTraits>{ a_string };
+			m_isDebugTruncated = a_string.size() > s_debugMaxSize;
+			m_debug = std::move(a_string);
 #endif
 		}
 
 #pragma endregion
 
 	private:
+#pragma region PRIVATE_CLASS_DATA
+		static constexpr std::size_t s_debugMaxSize = 64;
+#pragma endregion
+
 #pragma region PRIVATE_DATA
 #if VOB_MISHS_STRING_ID_DEBUG
-		std::optional<mistd::basic_bounded_string<TChar, TCharTraits, 64>> m_debug;
+		bool m_isDebugTruncated = true;
+		std::optional<mistd::basic_bounded_string<TChar, TCharTraits, s_debugMaxSize>> m_debug;
 #endif
 		std::uint64_t m_id;
 #pragma endregion

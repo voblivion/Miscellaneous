@@ -218,6 +218,15 @@ namespace vob::mistd
 	class basic_json_value
 	{
 	public:
+#pragma region TYPES
+		using null_type = basic_json_null<TAllocator>;
+		using boolean_type = basic_json_boolean<TAllocator>;
+		using number_type = basic_json_number<TAllocator>;
+		using string_type = basic_json_string<TAllocator>;
+		using array_type = basic_json_array<TAllocator>;
+		using object_type = basic_json_object<TAllocator>;
+#pragma endregion
+
 #pragma region CREATORS
 		/// @brief TODO
 		basic_json_value(TAllocator const& a_allocator = {})
@@ -286,20 +295,20 @@ namespace vob::mistd
 	using json_null = basic_json_null<>;
 	using json_boolean = basic_json_boolean<>;
 	using json_number = basic_json_number<>;
-	using json_value = basic_json_value<>;
 	using json_string = basic_json_string<>;
 	using json_array = basic_json_array<>;
 	using json_object = basic_json_object<>;
+	using json_value = basic_json_value<>;
 
 	namespace pmr
 	{
 		using json_null = basic_json_null<std::pmr::polymorphic_allocator<char>>;
 		using json_boolean = basic_json_boolean<std::pmr::polymorphic_allocator<char>>;
 		using json_number = basic_json_number<std::pmr::polymorphic_allocator<char>>;
-		using json_value = basic_json_value<std::pmr::polymorphic_allocator<char>>;
 		using json_string = basic_json_string<std::pmr::polymorphic_allocator<char>>;
 		using json_array = basic_json_array<std::pmr::polymorphic_allocator<char>>;
 		using json_object = basic_json_object<std::pmr::polymorphic_allocator<char>>;
+		using json_value = basic_json_value<std::pmr::polymorphic_allocator<char>>;
 	}
 
 	/// @brief TODO

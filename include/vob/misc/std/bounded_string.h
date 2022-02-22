@@ -9,7 +9,7 @@
 namespace vob::mistd
 {
 	/// @brief A string-like object whose size is bounded by a compile-time maximum.
-	template <typename TChar, typename TCharTrait, std::size_t t_maxSize>
+	template <typename TChar, typename TCharTraits, std::size_t t_maxSize>
 	class basic_bounded_string
 	{
 	public:
@@ -24,7 +24,7 @@ namespace vob::mistd
 		/// @brief Constructs a string from a c-style string (null-terminated).
 		constexpr basic_bounded_string(TChar const* const a_cstr) noexcept
 		{
-			assign(std::basic_string_view<TChar, TCharTrait>{ a_cstr });
+			assign(std::basic_string_view<TChar, TCharTraits>{ a_cstr });
 		}
 
 		/// @brief Constructs a string from a string-like object.
@@ -59,6 +59,18 @@ namespace vob::mistd
 		{
 			return m_size;
 		}
+
+		/// @brief TODO
+		constexpr auto get_string_view() const noexcept
+		{
+			return std::basic_string_view<TChar, TCharTraits>{ c_str(), size() };
+		}
+
+		/// @brief Explicitly converts the internal representation of the instance to a standard string_view
+		explicit constexpr operator std::basic_string_view<TChar, TCharTraits>() const
+		{
+			return get_string_view();
+		}
 #pragma endregion
 
 #pragma region MANIPULATORS
@@ -71,12 +83,6 @@ namespace vob::mistd
 			m_size = std::min(a_string.size(), t_maxSize);
 			std::copy(a_string.data(), a_string.data() + m_size, &m_data[0]);
 			m_data[m_size] = {};
-		}
-
-		/// @brief Explicitly converts the internal representation of the instance to a standard string_view
-		explicit constexpr operator std::basic_string_view<TChar>()
-		{
-			return { c_str(), size() };
 		}
 #pragma endregion
 

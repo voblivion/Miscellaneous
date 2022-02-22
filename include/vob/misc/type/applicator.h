@@ -90,7 +90,9 @@ namespace vob::misty
 		/// @brief Returns whether or not a type has been registered to be handled by this applicator.
 		bool is_registered(std::type_index const a_typeIndex) const
 		{
-			return m_typeApplicators.find(a_typeIndex) != m_typeApplicators.end();
+			auto it = m_typeApplicators.find(a_typeIndex);
+			auto e = m_typeApplicators.end();
+			return it != e;
 		}
 
 		/// @brief Returns whether or not a type has been registered to be handled by this applicator.
@@ -103,14 +105,17 @@ namespace vob::misty
 		/// @brief Applies this applicator to the exact type of passed object.
 		/// Does nothing if object's type hasn't been registered.
 		template <typename TValue>
-		void apply(TValue& a_object, TArgs&&... a_args) const
+		bool apply(TValue& a_object, TArgs&&... a_args) const
 		{
 			assert(is_registered(typeid(a_object)));
 			auto const t_it = m_typeApplicators.find(typeid(a_object));
-			if(t_it != m_typeApplicators.end())
+			if (t_it == m_typeApplicators.end())
 			{
-				t_it->second->apply(&a_object, std::forward<TArgs>(a_args)...);
+				return false;
 			}
+
+			t_it->second->apply(&a_object, std::forward<TArgs>(a_args)...);
+			return true;
 		}
 #pragma endregion
 

@@ -146,6 +146,12 @@ namespace vob::misty
 			return m_value.get();
 		}
 
+		/// @brief Provides access to the internal unique_ptr used by this clone instance.
+		[[nodiscard]] auto const& get_representation() const
+		{
+			return m_value;
+		}
+
 		/// @brief Provides a const pointer to the polymorphic type stored in this clone instance.
 		[[nodiscard]] TValue const* operator->() const
 		{

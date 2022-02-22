@@ -14,7 +14,7 @@ namespace vob::misty
 	namespace detail
 	{
 		/// @brief TODO
-		template <typename TPolymorphicBase, typename TAllocator>
+		template <typename TAllocator>
 		class type_factory_base
 		{
 		public:
@@ -25,18 +25,17 @@ namespace vob::misty
 
 #pragma region ACCESSORS
 			/// @brief TODO
-			virtual mistd::polymorphic_ptr<TPolymorphicBase> create(TAllocator const& a_allocator) = 0;
+			virtual mistd::polymorphic_ptr<void> create(TAllocator const& a_allocator) = 0;
 
 			/// @brief TODO
-			virtual std::shared_ptr<TPolymorphicBase> create_shared(TAllocator const& a_allocator) = 0;
+			virtual std::shared_ptr<void> create_shared(TAllocator const& a_allocator) = 0;
 #pragma endregion
 		};
 
 		/// @brief TODO
-		template <typename TPolymorphicBase, typename TAllocator, typename TValue, typename... TArgs>
-		requires std::is_base_of_v<TPolymorphicBase, TValue>
+		template <typename TAllocator, typename TValue, typename... TArgs>
 		class type_factory final
-			: public type_factory_base<TPolymorphicBase, TAllocator>
+			: public type_factory_base<TAllocator>
 		{
 		public:
 #pragma region CREATORS
@@ -48,13 +47,13 @@ namespace vob::misty
 
 #pragma region ACCESSORS
 			/// @brief TODO
-			mistd::polymorphic_ptr<TPolymorphicBase> create(TAllocator const& a_allocator) override
+			mistd::polymorphic_ptr<void> create(TAllocator const& a_allocator) override
 			{
 				return create_impl(a_allocator, std::index_sequence_for<TArgs...>{});
 			}
 
 			/// @brief TODO
-			std::shared_ptr<TPolymorphicBase> create_shared(TAllocator const& a_allocator) override
+			std::shared_ptr<void> create_shared(TAllocator const& a_allocator) override
 			{
 				return create_shared_impl(a_allocator, std::index_sequence_for<TArgs...>{});
 			}
@@ -68,7 +67,7 @@ namespace vob::misty
 #pragma region PRIVATE_ACCESSORS
 			/// @brief TODO
 			template <std::size_t... t_indices>
-			mistd::polymorphic_ptr<TPolymorphicBase> create_impl(
+			mistd::polymorphic_ptr<void> create_impl(
 				TAllocator const& a_allocator, std::index_sequence<t_indices...>)
 			{
 				return mistd::polymorphic_ptr_util::allocate<TValue>(
@@ -77,7 +76,7 @@ namespace vob::misty
 
 			/// @brief TODO
 			template <std::size_t... t_indices>
-			std::shared_ptr<TPolymorphicBase> create_shared_impl(
+			std::shared_ptr<void> create_shared_impl(
 				TAllocator const& a_allocator, std::index_sequence<t_indices...>)
 			{
 				return std::allocate_shared<TValue>(
@@ -89,25 +88,24 @@ namespace vob::misty
 
 	/// @brief TODO
 	template <
-		typename TPolymorphicBase,
 		typename TRegistry = registry const&,
-		typename TCreateAllocator = std::allocator<TPolymorphicBase>,
+		typename TCreateAllocator = std::allocator<char>,
 		typename TAllocator = TCreateAllocator>
-	class factory
+	class basic_factory
 	{
 #pragma region PRIVATE_TYPES
-		using type_factory_base = detail::type_factory_base<TPolymorphicBase, TCreateAllocator>;
+		using type_factory_base = detail::type_factory_base<TCreateAllocator>;
 
 		using type_factory_map_allocator = std::allocator_traits<TAllocator>::template rebind_alloc<
 			std::pair<std::type_index const, mistd::polymorphic_ptr<type_factory_base>>>;
 
 		template <typename TValue, typename... TArgs>
-		using type_factory = detail::type_factory<TPolymorphicBase, TCreateAllocator, TValue, TArgs...>;
+		using type_factory = detail::type_factory<TCreateAllocator, TValue, TArgs...>;
 #pragma endregion
 	public:
 #pragma region CREATORS
 		/// @brief TODO
-		explicit factory(
+		explicit basic_factory(
 			TRegistry a_registry,
 			TCreateAllocator const& a_createAllocator = {},
 			TAllocator const& a_allocator = {})
@@ -223,11 +221,11 @@ namespace vob::misty
 #pragma endregion
 	};
 
+	using factory = basic_factory<>;
+
 	namespace pmr
 	{
 		/// @brief TODO
-		template <typename TPolymorphicBase>
-		using factory = misty::factory<
-			TPolymorphicBase, registry const&, std::pmr::polymorphic_allocator<TPolymorphicBase>>;
+		using factory = basic_factory<registry const&, std::pmr::polymorphic_allocator<char>>;
 	}
 }

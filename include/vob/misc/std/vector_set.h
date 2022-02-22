@@ -93,6 +93,12 @@ namespace vob::mistd
 		}
 
 		/// @brief TODO
+		void clear()
+		{
+			m_data.clear();
+		}
+
+		/// @brief TODO
 		auto erase(const_iterator a_it)
 		{
 			auto const begin_it = const_cast<vector_set const&>(*this).begin();
