@@ -110,4 +110,6 @@ namespace vob::misph
 	using unit_acceleration = unit_multiply_t<unit_velocity, unit_frequency>;
 	/// @brief Type representing a force (N = kg*m/s^2) within the International System of Units.
 	using unit_force = unit_multiply_t<unit_mass, unit_acceleration>;
+	/// @brief Type representing an energy (J = kg*m^2/s^2) within the International System of Units
+	using unit_energy = unit_multiply_t<unit_force, unit_length>;
 }

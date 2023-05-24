@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?> 
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+  <!-- Measure Time -->
+  <Type Name="vob::misph::measure&lt;vob::misph::unit&lt;0,0,1,0,0,0&gt;,*&gt;">
+    <DisplayString Condition="m_value &lt; 1.0">{{ {m_value/1000,g}ms }}</DisplayString>
+    <DisplayString Condition="m_value &lt; 60.0">{{ {int(m_value)}s {m_value-int(m_value),g}ms }}</DisplayString>
+    <DisplayString Condition="m_value &lt; 3600.0">{{ {int(m_value/60)}min {int(m_value)-60*int(m_value/60)}s {m_value-int(m_value),g}ms }}</DisplayString>
+    <DisplayString>{{ {int(m_value/3600)}h {int((m_value-int(m_value/3600)*3600)/60)}min {int(m_value)-60*int(m_value/60)}s {m_value-int(m_value),g}ms }}</DisplayString>
+  </Type>
+  <!-- Measure Calories -->
+  <Type Name="vob::misph::measure&lt;vob::misph::unit&lt;1,2,-2,0,0,0&gt;,*&gt;">
+    <DisplayString Condition="m_value &lt; 1000.0">{{ {m_value,g}J }}</DisplayString>
+    <DisplayString>{{ {m_value/1000,g} kJ }}</DisplayString>
+  </Type>
+</AutoVisualizer>

@@ -38,7 +38,7 @@ namespace vob::misph
 		requires treat_as_floating_point_v<TRepresentation>
 			|| (!treat_as_floating_point_v<TRepresentation2>)
 		constexpr measure(measure<TUnit, TRepresentation2> const& a_other)
-			: m_value{ static_cast<TRepresentation2>(a_other.get_value()) }
+			: m_value{ static_cast<TRepresentation>(a_other.get_value()) }
 		{}
 #pragma endregion
 
@@ -135,7 +135,7 @@ namespace vob::misph
 
 		/// @brief Constructs a measure with an initial representation.
 		/// @param a_value : the value assign to the measure.
-		explicit measure(TRepresentation const& a_value)
+		constexpr measure(TRepresentation const& a_value)
 			: m_value{ a_value }
 		{}
 
@@ -378,6 +378,8 @@ namespace vob::misph
 	using measure_acceleration = measure<unit_acceleration>;
 	/// @brief Force quantity within the International System of units, in Newton (N = kg*m/s^2).
 	using measure_force = measure<unit_force>;
+	/// @brief Energy quantity within the International System of units, in Joules (J = kg*m^2/s^2).
+	using measure_energy = measure<unit_energy>;
 
 	namespace detail
 	{
@@ -508,4 +510,185 @@ namespace vob::misph
 		return detail::measure_make(a_lhs) / a_rhs;
 	}
 #pragma endregion
+
+#pragma region IOS_OPERATORS
+	namespace detail
+	{
+		template <typename TUnit, typename TRepresentation, typename TSymbol>
+		std::ostream& output(std::ostream& o_out, measure<TUnit, TRepresentation> const& a_measure, TSymbol const& a_unit)
+		{
+			constexpr auto k_zero = static_cast<TRepresentation>(0.0);
+
+			auto const signedValue = a_measure.get_value();
+			auto const value = std::abs(signedValue);
+
+			if (signedValue < k_zero)
+			{
+				o_out << '-';
+			}
+
+			if (value == k_zero)
+			{
+				return o_out << 0 << a_unit;
+			}
+			if (value < 0.001)
+			{
+				return o_out << value * static_cast<TRepresentation>(1'000.0) << 'u' << a_unit;
+			}
+			if (value < 0.01)
+			{
+				return o_out << value * static_cast<TRepresentation>(100.0) << 'm' << a_unit;
+			}
+			if (value < 0.1)
+			{
+				return o_out << value * static_cast<TRepresentation>(10.0) << 'c' << a_unit;
+			}
+			if (value < 1.0)
+			{
+				return o_out << value * static_cast<TRepresentation>(10.0) << 'd' << a_unit;
+			}
+			if (value < 10.0)
+			{
+				return o_out << value << a_unit;
+			}
+			if (value < 100.0)
+			{
+				return o_out << value / static_cast<TRepresentation>(10.0) << "da" << a_unit;
+			}
+			if (value < 1'000.0)
+			{
+				return o_out << value / static_cast<TRepresentation>(100.0) << 'h' << a_unit;
+			}
+
+			return o_out << value / static_cast<TRepresentation>(1'000.0) << 'k' << a_unit;
+		}
+	}
+
+	template <typename TRepresentation>
+	std::ostream& operator<<(std::ostream& o_out, measure<unit_scalar, TRepresentation> const& a_measure)
+	{
+		return o_out << a_measure.get_value();
+	}
+
+	template <typename TRepresentation>
+	std::ostream& operator<<(std::ostream& o_out, measure<unit_mass, TRepresentation> const& a_measure)
+	{
+		return detail::output(o_out, a_measure, 'g');
+	}
+
+	template <typename TRepresentation>
+	std::ostream& operator<<(std::ostream& o_out, measure<unit_length, TRepresentation> const& a_measure)
+	{
+		return detail::output(o_out, a_measure, 'm');
+	}
+
+	template <typename TRepresentation>
+	std::ostream& operator<<(std::ostream& o_out, measure<unit_time, TRepresentation> const& a_measure)
+	{
+		auto const signedValue = a_measure.get_value();
+		auto const value = std::abs(signedValue);
+
+		if (value < 60.0)
+		{
+			return detail::output(o_out, a_measure, 'm');
+		}
+
+		constexpr auto k_secondsInDay = static_cast<TRepresentation>(60.0 * 60.0 * 24.0);
+		constexpr auto k_secondsInHour = static_cast<TRepresentation>(60.0 * 60.0);
+		constexpr auto k_secondsInMinute = static_cast<TRepresentation>(60.0);
+		auto const days = static_cast<uint32_t>(value / k_secondsInDay);
+		auto const hours = static_cast<uint32_t>((value - days * k_secondsInDay) / k_secondsInHour);
+		auto const minutes = static_cast<uint32_t>((value - days * k_secondsInDay - hours * k_secondsInHour) / k_secondsInMinute);
+		auto const seconds = static_cast<uint32_t>(value - days * k_secondsInDay - hours * k_secondsInHour - minutes * k_secondsInMinute);
+
+		if (signedValue < static_cast<TRepresentation>(0.0))
+		{
+			o_out << '-';
+		}
+
+		if (value < k_secondsInMinute)
+		{
+			return o_out << seconds << "s";
+		}
+		if (value < k_secondsInHour)
+		{
+			return o_out << minutes << "min " << seconds << "s";
+		}
+		if (value < k_secondsInDay)
+		{
+			return o_out << hours << "h " << minutes << "min " << seconds << "s";
+		}
+
+		return o_out << days << "day " << hours << "h " << minutes << "min " << seconds << "s";
+	}
+
+	template <typename TRepresentation>
+	std::ostream& operator<<(std::ostream& o_out, measure<unit_current, TRepresentation> const& a_measure)
+	{
+		return detail::output(o_out, a_measure, 'm');
+	}
+
+	template <typename TRepresentation>
+	std::ostream& operator<<(std::ostream& o_out, measure<unit_temperature, TRepresentation> const& a_measure)
+	{
+		return detail::output(o_out, a_measure, 'K');
+	}
+
+	template <typename TRepresentation>
+	std::ostream& operator<<(std::ostream& o_out, measure<unit_luminous_intensity, TRepresentation> const& a_measure)
+	{
+		return detail::output(o_out, a_measure, "cd");
+	}
+
+	template <typename TRepresentation>
+	std::ostream& operator<<(std::ostream& o_out, measure<unit_area, TRepresentation> const& a_measure)
+	{
+		return o_out << a_measure.get_value() << "m^2";
+	}
+
+	template <typename TRepresentation>
+	std::ostream& operator<<(std::ostream& o_out, measure<unit_volume, TRepresentation> const& a_measure)
+	{
+		return o_out << a_measure.get_value() << "m^3";
+	}
+
+	template <typename TRepresentation>
+	std::ostream& operator<<(std::ostream& o_out, measure<unit_frequency, TRepresentation> const& a_measure)
+	{
+		detail::output(o_out, a_measure, "Hz");
+	}
+
+	template <typename TRepresentation>
+	std::ostream& operator<<(std::ostream& o_out, measure<unit_velocity, TRepresentation> const& a_measure)
+	{
+		return o_out << a_measure.get_value() << "m/s";
+	}
+
+	template <typename TRepresentation>
+	std::ostream& operator<<(std::ostream& o_out, measure<unit_acceleration, TRepresentation> const& a_measure)
+	{
+		return o_out << a_measure.get_value() << "m/s^2";
+	}
+
+	template <typename TRepresentation>
+	std::ostream& operator<<(std::ostream& o_out, measure<unit_force, TRepresentation> const& a_measure)
+	{
+		return detail::output(o_out, a_measure, "N");
+	}
+
+	template <typename TRepresentation>
+	std::ostream& operator<<(std::ostream& o_out, measure<unit_energy, TRepresentation> const& a_measure)
+	{
+		return detail::output(o_out, a_measure, "J");
+	}
+#pragma endregion
+}
+
+namespace std
+{
+	template <typename TUnit, typename TRepresentation>
+	auto abs(vob::misph::measure<TUnit, TRepresentation> const& a_value)
+	{
+		return a_value.get_value() > TRepresentation{} ? a_value : -a_value;
+	}
 }
