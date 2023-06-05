@@ -286,6 +286,13 @@ namespace vob::misph
 		{
 			return m_value;
 		}
+
+		template <typename TRepresentation2, typename TPeriod>
+		operator std::chrono::duration<TRepresentation2, TPeriod>()
+		{
+			return { std::chrono::duration_cast<std::chrono::duration<TRepresentation2, TPeriod>>(
+				std::chrono::duration<TRepresentation>{ m_value }) };
+		}
 #pragma endregion
 
 #pragma region MANIPULATORS
