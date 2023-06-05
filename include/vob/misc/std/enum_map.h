@@ -1,6 +1,6 @@
 #pragma once
 
-#include "conditional_const.h"
+#include <vob/misc/std/conditional_const.h>
 
 #include <array>
 #include <cassert>
@@ -9,14 +9,101 @@
 
 namespace vob::mistd
 {
-    template <typename TEnum, TEnum t_begin, TEnum t_end, typename TValue>
+    template <typename TEnum>
+    constexpr TEnum enum_begin()
+    {
+        return static_cast<TEnum>(0);
+    }
+
+    template <typename TEnum>
+    constexpr TEnum enum_end()
+    {
+        return TEnum::count;
+    }
+
+    template <typename TEnum, TEnum t_begin = enum_end<TEnum>(), TEnum t_end = enum_begin<TEnum>()>
+    class enum_range
+    {
+        static constexpr auto begin_value = t_begin < t_end ? t_begin : t_end;
+        static constexpr auto end_value = t_begin < t_end ? t_end : t_begin;
+    public:
+        class iterator
+        {
+        public:
+            explicit iterator(TEnum const a_value)
+                : m_value{ a_value }
+            {
+            }
+
+            TEnum operator*() const
+            {
+                return m_value;
+            }
+
+            iterator& operator++()
+            {
+                m_value = static_cast<TEnum>(
+                    static_cast<std::underlying_type_t<TEnum>>(m_value) + 1);
+                return *this;
+            }
+
+            iterator operator++(int)
+            {
+                auto const copy = *this;
+                ++(*this);
+                return copy;
+            }
+
+            iterator& operator--()
+            {
+                m_value = static_cast<TEnum>(
+                    static_cast<std::underlying_type_t<TEnum>>(m_value) - 1);
+                return *this;
+            }
+
+            iterator operator--(int)
+            {
+                auto const copy = *this;
+                --(*this);
+                return copy;
+            }
+
+            friend bool operator==(iterator const& a_lhs, iterator const& a_rhs)
+            {
+                return a_lhs.m_value == a_rhs.m_value;
+            }
+
+            friend bool operator!=(iterator const& a_lhs, iterator const& a_rhs)
+            {
+                return a_lhs.m_value != a_rhs.m_value;
+            }
+
+        private:
+            TEnum m_value;
+        };
+
+        iterator begin() const
+        {
+            return iterator{ begin_value };
+        }
+
+        iterator end() const
+        {
+            return iterator{ end_value };
+        }
+    };
+
+    template <typename TEnum, typename TValue, TEnum t_begin = enum_end<TEnum>(), TEnum t_end = enum_begin<TEnum>()>
     class enum_map
     {
     public:
 #pragma region CLASS_DATA
-        static constexpr auto begin_value = std::underlying_type_t<TEnum>{ t_begin };
-        static constexpr auto end_value = std::underlying_type_t<TEnum>{ t_end };
-        static_assert(begin_value < end_value && "Invalid enum range for enum_map.");
+        static constexpr auto begin_key = t_begin < t_end ? t_begin : t_end;
+        static constexpr auto end_key = t_begin < t_end ? t_end : t_begin;
+        static constexpr auto begin_index = static_cast<std::underlying_type_t<TEnum>>(begin_key);
+        static constexpr auto end_index = static_cast<std::underlying_type_t<TEnum>>(end_key);
+        static_assert(begin_index <= end_index && "Invalid enum range for enum_map.");
+        static constexpr auto value_count = static_cast<std::size_t>(end_index - begin_index);
 #pragma endregion
 
 #pragma region CREATORS
@@ -24,8 +111,13 @@ namespace vob::mistd
         constexpr enum_map() = default;
 
         /// @brief TODO
-        explicit constexpr enum_map(TValue const& a_init_value)
-            : m_data{ a_init_value }
+        explicit constexpr enum_map(TValue const& a_initValue)
+            : m_data{ a_initValue }
+        {}
+
+        template <typename... TArgs>
+        constexpr enum_map(TArgs&&... a_args)
+            : m_data{ std::forward<TArgs>(a_args)... }
         {}
 #pragma endregion
 
@@ -51,7 +143,7 @@ namespace vob::mistd
         [[nodiscard]] constexpr auto const& operator[](TEnum a_key) const
         {
             assert(contains(a_key));
-            return m_data[std::underlying_type_t<TEnum>{ a_key } - begin_value];
+            return m_data[static_cast<std::underlying_type_t<TEnum>>(a_key) - begin_index];
         }
 
         /// @brief TODO
@@ -69,7 +161,7 @@ namespace vob::mistd
         /// @brief TODO
         [[nodiscard]] constexpr auto contains(TEnum a_key) const
         {
-            return static_cast<std::size_t>(a_key) - begin_value < end_value;
+            return static_cast<std::size_t>(a_key) - begin_index < end_index;
         }
 #pragma endregion
 
@@ -95,15 +187,11 @@ namespace vob::mistd
         [[nodiscard]] constexpr auto& operator[](TEnum a_key)
         {
             assert(contains(a_key));
-            return m_data[std::underlying_type_t<TEnum>{ a_key } - begin_value];
+            return m_data[static_cast<std::underlying_type_t<TEnum>>(a_key) - begin_index];
         }
 #pragma endregion
 
     private:
-#pragma region PRIVATE_CLASS_DATA
-        static constexpr auto value_count = static_cast<std::size_t>(end_value - begin_value);
-#pragma endregion
-
 #pragma region DATA
         std::array<TValue, value_count> m_data;
 #pragma endregion
