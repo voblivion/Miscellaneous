@@ -1,6 +1,7 @@
 #pragma once
 
-#include <mutex>
+#include <memory>
+#include <span>
 #include <vector>
 
 
@@ -12,5 +13,5 @@ namespace vob::mismt
 		virtual void execute() const = 0;
 	};
 
-	using task_list = std::vector<std::unique_ptr<basic_task>>;
+	using task_span = std::span<std::shared_ptr<basic_task>>;
 }
