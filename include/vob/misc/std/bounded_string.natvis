@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+  <Type Name="vob::mistd::basic_bounded_string&lt;*&gt;">
+    <Intrinsic Name="size" Expression="m_size" />
+    <DisplayString>{m_data._Elems}</DisplayString>
+  </Type>
+</AutoVisualizer>
