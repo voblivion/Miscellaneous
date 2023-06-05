@@ -48,7 +48,7 @@ namespace vob::mistd
 			std::integer_sequence<std::underlying_type_t<TEnum>, t_indexes...> a_sequence)
 		{
 			using integer_type = std::underlying_type_t<TEnum>;
-			return integer_sequence_util::filter<integer_type, enum_traits_is_valid<TEnum>::type>(a_sequence);
+			return integer_sequence_util::filter<integer_type, enum_traits_is_valid<TEnum>::template type>(a_sequence);
 		}
 
 		template <typename TEnum, typename TReflectedRange>
