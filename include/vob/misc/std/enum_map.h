@@ -27,10 +27,10 @@ namespace vob::mistd
         static constexpr auto begin_value = t_begin < t_end ? t_begin : t_end;
         static constexpr auto end_value = t_begin < t_end ? t_end : t_begin;
     public:
-        class iterator
+        class const_iterator
         {
         public:
-            explicit iterator(TEnum const a_value)
+            explicit const_iterator(TEnum const a_value)
                 : m_value{ a_value }
             {
             }
@@ -40,40 +40,40 @@ namespace vob::mistd
                 return m_value;
             }
 
-            iterator& operator++()
+            const_iterator& operator++()
             {
                 m_value = static_cast<TEnum>(
                     static_cast<std::underlying_type_t<TEnum>>(m_value) + 1);
                 return *this;
             }
 
-            iterator operator++(int)
+            const_iterator operator++(int)
             {
                 auto const copy = *this;
                 ++(*this);
                 return copy;
             }
 
-            iterator& operator--()
+            const_iterator& operator--()
             {
                 m_value = static_cast<TEnum>(
                     static_cast<std::underlying_type_t<TEnum>>(m_value) - 1);
                 return *this;
             }
 
-            iterator operator--(int)
+            const_iterator operator--(int)
             {
                 auto const copy = *this;
                 --(*this);
                 return copy;
             }
 
-            friend bool operator==(iterator const& a_lhs, iterator const& a_rhs)
+            friend bool operator==(const_iterator const& a_lhs, const_iterator const& a_rhs)
             {
                 return a_lhs.m_value == a_rhs.m_value;
             }
 
-            friend bool operator!=(iterator const& a_lhs, iterator const& a_rhs)
+            friend bool operator!=(const_iterator const& a_lhs, const_iterator const& a_rhs)
             {
                 return a_lhs.m_value != a_rhs.m_value;
             }
@@ -82,14 +82,14 @@ namespace vob::mistd
             TEnum m_value;
         };
 
-        iterator begin() const
+        const_iterator begin() const
         {
-            return iterator{ begin_value };
+            return const_iterator{ begin_value };
         }
 
-        iterator end() const
+        const_iterator end() const
         {
-            return iterator{ end_value };
+            return const_iterator{ end_value };
         }
     };
 
@@ -104,6 +104,9 @@ namespace vob::mistd
         static constexpr auto end_index = static_cast<std::underlying_type_t<TEnum>>(end_key);
         static_assert(begin_index <= end_index && "Invalid enum range for enum_map.");
         static constexpr auto value_count = static_cast<std::size_t>(end_index - begin_index);
+
+        using key_type = TEnum;
+        using value_type = TValue;
 #pragma endregion
 
 #pragma region CREATORS
@@ -176,6 +179,11 @@ namespace vob::mistd
         [[nodiscard]] constexpr auto end()
         {
             return m_data.end();
+        }
+
+        [[nodiscard]] constexpr auto keys()
+        {
+            return enum_range<TEnum, begin_index, end_index>{};
         }
 
         /// @brief TODO
