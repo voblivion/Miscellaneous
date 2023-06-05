@@ -172,7 +172,9 @@ namespace vob::misty
 		requires std::is_base_of_v<TBase, TDerived>
 		void register_type(mishs::string_id const a_id)
 		{
-			assert(!is_registered<TDerived>() && !is_used(a_id) && is_registered<TBase>());
+			assert(!is_registered<TDerived>());
+			assert(!is_used(a_id));
+			assert(is_registered<TBase>());
 			m_typeData.emplace(typeid(TDerived), type_data{ a_id, m_hierarchy.size() });
 			m_idToTypeIndex.emplace(a_id, typeid(TDerived));
 			m_hierarchy.emplace_back(m_typeData.find(typeid(TBase))->second.index);
