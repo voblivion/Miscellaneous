@@ -17,44 +17,31 @@
 namespace vob::misvi
 {
 	template <
-		typename TJsonValue,
-		typename TFactory,
-		typename TApplicatorAllocator,
 		typename TContext,
-		typename TAllocator>
-	class basic_json_reader
+		typename TJsonValue = mistd::json_value,
+		typename TApplicatorAllocator = std::allocator<char>,
+		typename TStackAllocator = std::allocator<std::reference_wrapper<mistd::json_value const>>>
+	class json_reader
 	{
 #pragma region PRIVATE_TYPES
-		using self = basic_json_reader<TJsonValue, TFactory, TApplicatorAllocator, TContext, TAllocator>;
+		using self = json_reader<
+			TContext, TJsonValue, TApplicatorAllocator, TStackAllocator>;
 		using json_value_ref = std::reference_wrapper<TJsonValue const>;
 #pragma endregion
 	public:
-
-#pragma region TYPES
-		using allocator = TAllocator;
-#pragma endregion
-
 #pragma region CREATORS
 		/// @brief TODO
-		basic_json_reader(
-			TFactory const& a_factory,
+		json_reader(
 			applicator<false, self, TApplicatorAllocator> const& a_applicator,
 			TContext a_context,
-			TAllocator a_allocator = {})
-			: m_factory{ a_factory }
-			, m_applicator{ a_applicator }
+			TStackAllocator a_allocator = {})
+			: m_applicator{ a_applicator }
 			, m_context{ std::forward<TContext>(a_context) }
-			, m_stack{ std::deque<json_value_ref, TAllocator>{ a_allocator } }
+			, m_stack{ std::deque<json_value_ref, TStackAllocator>{ a_allocator } }
 		{}
 #pragma endregion
 
 #pragma region ACCESSORS
-		/// @brief TODO
-		[[nodiscard]] auto const& get_factory() const
-		{
-			return m_factory;
-		}
-
 		/// @brief TODO
 		[[nodiscard]] auto const& get_applicator() const
 		{
@@ -214,31 +201,22 @@ namespace vob::misvi
 
 	private:
 #pragma region PRIVATE_DATA
-		TFactory const& m_factory;
 		applicator<false, self, TApplicatorAllocator> const& m_applicator;
 		TContext m_context;
-		std::stack<json_value_ref, std::deque<json_value_ref, TAllocator>> m_stack;
+		std::stack<json_value_ref, std::deque<json_value_ref, TStackAllocator>> m_stack;
 #pragma endregion
 	};
-
-	/// @brief TODO
-	template <typename TContext>
-	using json_reader = basic_json_reader<
-		mistd::json_value,
-		misty::factory,
-		std::allocator<char>,
-		TContext,
-		std::allocator<std::reference_wrapper<mistd::json_value const>>>;
 
 	namespace pmr
 	{
 		/// @brief TODO
-		template <typename TContext>
-		using json_reader = basic_json_reader<
-			mistd::pmr::json_value,
-			misty::pmr::factory,
-			std::pmr::polymorphic_allocator<char>,
-			TContext,
-			std::pmr::polymorphic_allocator<std::reference_wrapper<mistd::pmr::json_value const>>>;
+		template <
+			typename TContext,
+			typename TJsonValue = mistd::pmr::json_value,
+			typename TApplicatorAllocator = std::pmr::polymorphic_allocator<char>,
+			typename TStackAllocator = std::pmr::polymorphic_allocator<
+				std::reference_wrapper<mistd::pmr::json_value const>>>
+		using json_reader = json_reader<
+			TContext, TJsonValue, TApplicatorAllocator, TStackAllocator>;
 	}
 }
