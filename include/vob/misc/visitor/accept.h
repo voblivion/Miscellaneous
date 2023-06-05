@@ -316,7 +316,9 @@ namespace vob::misvi
 	template <typename TVisitor, typename TBase>
 	bool accept(TVisitor& a_visitor, std::shared_ptr<TBase>& a_ptr)
 	{
-		auto const& factory = a_visitor.get_factory();
+		// TODO
+		auto const& context = a_visitor.get_context();
+		auto const& factory = context.get_factory();
 		auto const& registry = factory.get_registry();
 		mishs::string_id id;
 		if (!a_visitor.visit(nvp("type_id", id)))
@@ -324,22 +326,27 @@ namespace vob::misvi
 			return false;
 		}
 
-		a_ptr = factory.template create_shared<TBase>(id);
-		ignorable_assert(a_ptr != nullptr);
-		return detail::visit_data(a_visitor, a_ptr);
+		auto ptr = factory.template create_shared<std::remove_const_t<TBase>>(id);
+		ignorable_assert(ptr != nullptr);
+		auto const result = detail::visit_data(a_visitor, ptr);
+		a_ptr = std::move(ptr);
+		return result;
+
 	}
 
 	template <typename TVisitor, typename TBase>
 	bool accept(TVisitor& a_visitor, std::shared_ptr<TBase> const& a_ptr)
 	{
-		static_assert(false && "TODO");
+		assert(false); // static_assert(false && "TODO");
 		return true;
 	}
 
 	template <typename TVisitor, typename TBase>
 	bool accept(TVisitor& a_visitor, mistd::polymorphic_ptr<TBase>& a_ptr)
 	{
-		auto const& factory = a_visitor.get_factory();
+		// TODO
+		auto const& context = a_visitor.get_context();
+		auto const& factory = context.get_factory();
 		auto const& registry = factory.get_registry();
 		mishs::string_id id;
 		if (!a_visitor.visit(nvp("type_id", id)))
@@ -356,7 +363,7 @@ namespace vob::misvi
 	template <typename TVisitor, typename TBase>
 	bool accept(TVisitor& a_visitor, mistd::polymorphic_ptr<TBase> const& a_ptr)
 	{
-		static_assert(false && "TODO");
+		assert(false); // static_assert(false && "TODO");
 		return true;
 	}
 
