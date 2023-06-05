@@ -1,19 +1,18 @@
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <cassert>
 #include <functional>
 #include <vector>
 
-#include <vob/sta/algorithm.h>
-#include <vob/img/adam7.h>
-#include <vob/sta/vector_streambuf.h>
-#include <vob/sta/stream_reader.h>
-#include <vob/zlib/zlib.h>
+#include <vob/_todo_/img/adam7.h>
+#include <vob/_todo_/std/vector_streambuf.h>
+#include <vob/misc/std/bit_stream_reader.h>
+#include <vob/_todo_/zlib/zlib.h>
 
-#include <vob/img/image.h>
-#include <vob/img/error.h>
-#include "vob/sta/enum.h"
+#include <vob/_todo_/img/image.h>
+#include <vob/_todo_/img/error.h>
 
 namespace vob::img::png
 {
@@ -42,14 +41,9 @@ namespace vob::img::png::detail
 	};
 }
 
-VOB_STA_DECLARE_ENUM_REFLECTED_UNSIGNED(vob::img::png::detail::color_type, 7);
-
 namespace vob::img::png::detail
 {
-	using color_type_traits = sta::enum_traits<color_type>;
-	constexpr auto color_type_count = color_type_traits::values.size();
-
-	constexpr std::array<std::uint8_t, color_type_count> channel_count = {
+	constexpr std::array<std::uint8_t, 5> channel_count = {
 		1, 3, 0, 2, 4
 	};
 
@@ -57,7 +51,7 @@ namespace vob::img::png::detail
 	{
 		constexpr std::array<std::uint8_t, 5> valid_channel_depths = { 1, 2, 4, 8, 16 };
 
-		return sta::fix_c20_any_of(
+		return std::any_of(
 			valid_channel_depths.begin()
 			, valid_channel_depths.end()
 			, [&a_channel_depth](auto const a_valid_cd) { return a_valid_cd == a_channel_depth; }
@@ -69,7 +63,6 @@ namespace vob::img::png::detail
 		, std::uint8_t const a_valid_channel_depth
 	)
 	{
-		assert(sta::enum_value_is_valid(a_color_type));
 		assert(is_valid_channel_depth(a_valid_channel_depth));
 		if (a_color_type == color_type::palette)
 		{
