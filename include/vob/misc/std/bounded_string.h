@@ -88,7 +88,7 @@ namespace vob::mistd
 
 	private:
 #pragma region PRIVATE_DATA
-		std::array<TChar, t_maxSize + 1> m_data = {};
+		std::array<TChar, t_maxSize + 1> m_data = {0};
 		std::size_t m_size = 0;
 #pragma endregion
 	};
