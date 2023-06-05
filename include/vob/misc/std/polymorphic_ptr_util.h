@@ -26,5 +26,21 @@ namespace vob::mistd
 			return polymorphic_ptr<TDerived>{
 				static_cast<TDerived*>(a_ptr.release()), std::move(a_ptr.get_deleter()) };
 		}
+
+		template <typename TObject, typename... TArgs>
+		inline auto make(TArgs&&... a_args)
+		{
+			return allocate<TObject>(std::allocator<TObject>{}, std::forward<TArgs>(a_args)...);
+		}
+	}
+
+	namespace pmr::polymorphic_ptr_util
+	{
+		template <typename TObject, typename... TArgs>
+		inline auto make(TArgs&&... a_args)
+		{
+			return vob::mistd::polymorphic_ptr_util::allocate<TObject>(
+				std::pmr::polymorphic_allocator<TObject>{}, std::forward<TArgs>(a_args)...);
+		}
 	}
 }
