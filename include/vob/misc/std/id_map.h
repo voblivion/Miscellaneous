@@ -86,6 +86,11 @@ namespace vob::mistd
 				return !(a_lhs == a_rhs);
 			}
 
+			size_type id() const
+			{
+				return m_index;
+			}
+
 		private:
 			size_type m_index;
 			std::reference_wrapper<id_map> m_idMap;

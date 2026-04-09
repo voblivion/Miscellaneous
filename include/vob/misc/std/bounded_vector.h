@@ -86,6 +86,18 @@ namespace vob::mistd
 		{
 			return begin() + m_size;
 		}
+
+		constexpr decltype(auto) operator[](int32_t index) const
+		{
+			assert(0 <= index && index < m_size);
+			return *(begin() + index);
+		}
+
+		constexpr decltype(auto) operator[](int32_t index)
+		{
+			assert(0 <= index && index < m_size);
+			return *(begin() + index);
+		}
 #pragma endregion
 
 #pragma region MANIPULATORS
@@ -121,28 +133,28 @@ namespace vob::mistd
 		}
 
 		/// @brief Adds a value at the end of the container, constructed by move.
-		constexpr auto push_back(TValue&& a_value) noexcept
+		constexpr decltype(auto) push_back(TValue&& a_value) noexcept
 		{
 			assert(m_size < t_maxSize && "Adding a value in a full bounded_vector.");
 			auto ptr = begin() + m_size++;
-			return new(ptr) TValue{ std::move(a_value) };
+			return *(new(ptr) TValue{ std::move(a_value) });
 		}
 
 		/// @brief Adds a value at the end of the container, constructed by copy.
-		constexpr auto push_back(TValue const& a_value) noexcept
+		constexpr decltype(auto) push_back(TValue const& a_value) noexcept
 		{
 			assert(m_size < t_maxSize && "Adding a value in a full bounded_vector.");
 			auto ptr = begin() + m_size++;
-			return new(ptr) TValue{ a_value };
+			return *(new(ptr) TValue{ a_value });
 		}
 
 		/// @brief Constructs a value directly at the end of the container, increasing its size by one.
 		template <typename... TArgs>
-		constexpr auto emplace_back(TArgs&&... a_args) noexcept
+		constexpr decltype(auto) emplace_back(TArgs&&... a_args) noexcept
 		{
 			assert(m_size < t_maxSize && "Adding a value in a full bounded_vector.");
 			auto ptr = begin() + m_size++;
-			return new(ptr) TValue{ std::forward<TArgs>(a_args)... };
+			return *(new(ptr) TValue{ std::forward<TArgs>(a_args)... });
 		}
 
 		/// @brief Removes the last element of the container.
@@ -156,20 +168,26 @@ namespace vob::mistd
 		/// @brief Acquires elements of another bounded_vector, leaving it empty.
 		auto operator=(bounded_vector&& a_other) noexcept -> bounded_vector&
 		{
+			clear();
 			for (auto& value : a_other)
 			{
 				push_back(std::move(value));
 			}
 			a_other.clear();
+
+			return *this;
 		}
 
 		/// @brief Copies elements of another bounded_vector, leaving it unchanged.
 		auto operator=(bounded_vector const& a_other) noexcept -> bounded_vector&
 		{
+			clear();
 			for (auto const& value : a_other)
 			{
 				push_back(value);
 			}
+
+			return *this;
 		}
 #pragma endregion
 

@@ -52,5 +52,17 @@ namespace vob::mistd
 		{
 			return (filter_one<TInteger, TPredicate, t_integers>() + ...);
 		}
+
+		template <typename TInteger, TInteger t_integer, TInteger... t_integers>
+		constexpr TInteger front(std::integer_sequence<TInteger, t_integer, t_integers...>)
+		{
+			return t_integer;
+		}
+
+		template <typename TInteger, TInteger... t_integers>
+		constexpr TInteger back(std::integer_sequence<TInteger, t_integers...>)
+		{
+			return (t_integers, ...);
+		}
 	}
 }

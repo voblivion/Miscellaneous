@@ -1,6 +1,8 @@
 #pragma once
 
+#include <algorithm>
 #include <vector>
+
 
 namespace vob::mistd
 {

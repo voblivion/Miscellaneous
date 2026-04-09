@@ -2,6 +2,8 @@
 
 #include <vob/misc/std/conditional_const.h>
 
+#include <vob/misc/std/enum_traits.h>
+
 #include <array>
 #include <cassert>
 #include <utility>
@@ -9,19 +11,7 @@
 
 namespace vob::mistd
 {
-    template <typename TEnum>
-    constexpr TEnum enum_begin()
-    {
-        return static_cast<TEnum>(0);
-    }
-
-    template <typename TEnum>
-    constexpr TEnum enum_end()
-    {
-        return TEnum::count;
-    }
-
-    template <typename TEnum, TEnum t_begin = enum_end<TEnum>(), TEnum t_end = enum_begin<TEnum>()>
+    template <typename TEnum, TEnum t_begin = enum_traits<TEnum>::valid_begin, TEnum t_end = enum_traits<TEnum>::valid_end>
     class enum_range
     {
         static constexpr auto begin_value = t_begin < t_end ? t_begin : t_end;
@@ -93,15 +83,15 @@ namespace vob::mistd
         }
     };
 
-    template <typename TEnum, typename TValue, TEnum t_begin = enum_end<TEnum>(), TEnum t_end = enum_begin<TEnum>()>
+    template <typename TEnum, typename TValue, TEnum t_begin = enum_traits<TEnum>::valid_begin, TEnum t_end = enum_traits<TEnum>::valid_end>
     class enum_map
     {
     public:
 #pragma region CLASS_DATA
-        static constexpr auto begin_key = t_begin < t_end ? t_begin : t_end;
-        static constexpr auto end_key = t_begin < t_end ? t_end : t_begin;
-        static constexpr auto begin_index = static_cast<std::underlying_type_t<TEnum>>(begin_key);
-        static constexpr auto end_index = static_cast<std::underlying_type_t<TEnum>>(end_key);
+        static constexpr auto begin_key = std::to_underlying(t_begin) < std::to_underlying(t_end) ? t_begin : t_end;
+        static constexpr auto end_key = std::to_underlying(t_begin) < std::to_underlying(t_end) ? t_end : t_begin;
+        static constexpr auto begin_index = std::to_underlying(begin_key);
+        static constexpr auto end_index = std::to_underlying(end_key);
         static_assert(begin_index <= end_index && "Invalid enum range for enum_map.");
         static constexpr auto value_count = static_cast<std::size_t>(end_index - begin_index);
 
@@ -166,6 +156,17 @@ namespace vob::mistd
         {
             return static_cast<std::size_t>(a_key) - begin_index < end_index;
         }
+
+        /// @brief TODO
+        [[nodiscard]] constexpr auto data()
+        {
+            return m_data.data();
+        }
+
+        [[nodiscard]] constexpr auto data() const
+        {
+            return m_data.data();
+        }
 #pragma endregion
 
 #pragma region MANIPULATORS
@@ -183,7 +184,7 @@ namespace vob::mistd
 
         [[nodiscard]] constexpr auto keys()
         {
-            return enum_range<TEnum, begin_index, end_index>{};
+            return enum_range<TEnum, begin_key, end_key>{};
         }
 
         /// @brief TODO

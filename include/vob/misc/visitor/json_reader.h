@@ -96,7 +96,7 @@ namespace vob::misvi
 		bool visit(TValue& a_number)
 		{
 			auto const& currentValue = m_stack.top().get();
-			if (auto const number = currentValue.get<TJsonValue::number_type>())
+			if (auto const number = currentValue.get<typename TJsonValue::number_type>())
 			{
 				std::visit([&a_number](auto const a_value){ a_number = static_cast<TValue>(a_value); }, number->value);
 				return true;
@@ -108,7 +108,7 @@ namespace vob::misvi
 		bool visit(bool& a_boolean)
 		{
 			auto const& currentValue = m_stack.top().get();
-			if (auto const boolean = currentValue.get<TJsonValue::boolean_type>())
+			if (auto const boolean = currentValue.get<typename TJsonValue::boolean_type>())
 			{
 				a_boolean = boolean->value;
 				return true;
@@ -121,7 +121,7 @@ namespace vob::misvi
 		bool visit(std::basic_string<TChar, TCharTraits, TAllocator>& a_string)
 		{
 			auto const& currentValue = m_stack.top().get();
-			if (auto const string = currentValue.get<TJsonValue::string_type>())
+			if (auto const string = currentValue.get<typename TJsonValue::string_type>())
 			{
 				a_string.assign(string->value);
 				return true;
@@ -133,7 +133,7 @@ namespace vob::misvi
 		bool visit(size_tag& a_sizeTag)
 		{
 			auto const& currentValue = m_stack.top().get();
-			if (auto const array = currentValue.get<TJsonValue::array_type>())
+			if (auto const array = currentValue.get<typename TJsonValue::array_type>())
 			{
 				a_sizeTag.size = array->data.size();
 				return true;
@@ -147,7 +147,7 @@ namespace vob::misvi
 		{
 			// Current node is array
 			auto const& currentValue = m_stack.top().get();
-			auto const array = currentValue.get<TJsonValue::array_type>();
+			auto const array = currentValue.get<typename TJsonValue::array_type>();
 			if (array == nullptr)
 			{
 				return false;
@@ -172,7 +172,7 @@ namespace vob::misvi
 		{
 			// Current node is object
 			auto const& currentValue = m_stack.top().get();
-			auto const object = currentValue.get<TJsonValue::object_type>();
+			auto const object = currentValue.get<typename TJsonValue::object_type>();
 			if (object == nullptr)
 			{
 				return false;

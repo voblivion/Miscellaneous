@@ -7,6 +7,13 @@
 #include <mutex>
 #include <thread>
 
+#ifndef VOB_MISMT_PROFILE_THREAD
+#define VOB_MISMT_PROFILE_THREAD(threadName)
+#endif
+
+#ifndef VOB_MISMT_PROFILE_FRAME
+#define VOB_MISMT_PROFILE_FRAME(FrameName)
+#endif
 
 namespace vob::mismt
 {
@@ -30,9 +37,15 @@ namespace vob::mismt
 	using thread_schedule = basic_thread_schedule<std::allocator<task_id>>;
 
 	template <typename TAllocator>
+	using basic_thread_name_schedule_pair = std::pair<
+		std::basic_string<char, std::char_traits<char>, typename std::allocator_traits<TAllocator>::template rebind_alloc<char>>,
+		basic_thread_schedule<TAllocator>
+	>;
+
+	template <typename TAllocator>
 	using basic_schedule = std::vector<
-		basic_thread_schedule<TAllocator>,
-		typename std::allocator_traits<TAllocator>::template rebind_alloc<basic_thread_schedule<TAllocator>>
+		basic_thread_name_schedule_pair<TAllocator>,
+		typename std::allocator_traits<TAllocator>::template rebind_alloc<basic_thread_name_schedule_pair<TAllocator>>
 	>;
 
 	using schedule = basic_schedule<std::allocator<task_id>>;
@@ -90,7 +103,7 @@ namespace vob::mismt
 			}
 		}
 
-		template <typename TScheduleAllocator, typename TTaskStateAllocator>
+		template <typename TNameAllocator, typename TScheduleAllocator, typename TTaskStateAllocator>
 		class basic_thread_worker
 		{
 		public:
@@ -102,10 +115,12 @@ namespace vob::mismt
 			basic_thread_worker(basic_thread_worker const&) = delete;
 
 			basic_thread_worker(
+				std::basic_string<char, std::char_traits<char>, TNameAllocator> a_name,
 				task_span const& a_tasks,
 				basic_task_state_list<TTaskStateAllocator>& a_taskStates,
 				basic_thread_schedule<TScheduleAllocator> a_schedule)
-				: m_tasks{ a_tasks }
+				: m_name{ std::move(a_name) }
+				, m_tasks{ a_tasks }
 				, m_taskStates{ a_taskStates }
 				, m_schedule{ std::move(a_schedule) }
 			{
@@ -152,6 +167,7 @@ namespace vob::mismt
 			std::condition_variable m_sync;
 			std::thread m_thread;
 
+			std::basic_string<char, std::char_traits<char>, TNameAllocator> m_name;
 			task_span const& m_tasks;
 			basic_task_state_list<TTaskStateAllocator>& m_taskStates;
 			basic_thread_schedule<TScheduleAllocator> m_schedule;
@@ -159,9 +175,11 @@ namespace vob::mismt
 			// Methods
 			void start()
 			{
+				VOB_MISMT_PROFILE_THREAD(m_name.c_str());
 				auto query = Query::None;
 				while (query != Query::Stop)
 				{
+					// VOB_MISMT_PROFILE_FRAME(m_name.c_str());
 					query = wait_for_query();
 					if (query == Query::Execute)
 					{
@@ -199,7 +217,10 @@ namespace vob::mismt
 		using task_state_allocator =
 			typename std::allocator_traits<TAllocator>::template rebind_alloc<std::shared_ptr<detail::task_state>>;
 		using task_state_list = detail::basic_task_state_list<task_state_allocator>;
-		using thread_worker = detail::basic_thread_worker<TScheduleAllocator, task_state_allocator>;
+		using thread_worker = detail::basic_thread_worker<
+			typename std::allocator_traits<TScheduleAllocator>::template rebind_alloc<char>,
+			TScheduleAllocator,
+			task_state_allocator>;
 		using thread_worker_allocator =
 			typename std::allocator_traits<TAllocator>::template rebind_alloc<std::shared_ptr<thread_worker>>;
 		using thread_worker_list = std::vector<std::shared_ptr<thread_worker>, thread_worker_allocator>;
@@ -207,17 +228,21 @@ namespace vob::mismt
 	public:
 		// Types
 		using schedule = basic_schedule<TScheduleAllocator>;
-		using thread_schedule = basic_thread_schedule<TScheduleAllocator>;
+		using thread_name = schedule::value_type::first_type;
+		using thread_schedule = schedule::value_type::second_type;
 
 		// Constructors
 		basic_worker(basic_worker&&) = default;
 
 		basic_worker(basic_worker const&) = delete;
 
-		basic_worker(task_span const& a_tasks, schedule a_schedule)
+		basic_worker(task_span a_tasks, schedule a_schedule)
 			: m_tasks{ a_tasks }
-			, m_mainThreadSchedule{ std::move(a_schedule.front()) }
+			, m_mainThreadName( std::move(a_schedule.front().first) )
+			, m_mainThreadSchedule{ std::move(a_schedule.front().second) }
 		{
+			VOB_MISMT_PROFILE_THREAD(m_mainThreadName.c_str());
+
 			assert(!a_schedule.empty());
 
 			m_taskStates.resize(a_tasks.size());
@@ -231,7 +256,7 @@ namespace vob::mismt
 			while (++t_it != a_schedule.end())
 			{
 				m_threadWorkers.emplace_back(std::allocate_shared<thread_worker>(
-					m_threadWorkers.get_allocator(), a_tasks, m_taskStates, *t_it));
+					m_threadWorkers.get_allocator(), std::move(t_it->first), a_tasks, m_taskStates, std::move(t_it->second)));
 			}
 		}
 
@@ -240,6 +265,8 @@ namespace vob::mismt
 		// Methods
 		void execute()
 		{
+			VOB_MISMT_PROFILE_FRAME(m_mainThreadName.c_str());
+
 			reset_task_states();
 			for (auto& threadWorker : m_threadWorkers)
 			{
@@ -261,9 +288,10 @@ namespace vob::mismt
 		// Attributes
 
 		thread_worker_list m_threadWorkers;
-		task_span const& m_tasks;
+		task_span m_tasks;
 		
 		task_state_list m_taskStates;
+		thread_name m_mainThreadName;
 		thread_schedule m_mainThreadSchedule;
 
 		// Methods

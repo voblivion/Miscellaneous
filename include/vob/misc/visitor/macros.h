@@ -12,4 +12,5 @@ bool accept(TVisitor& a_visitor, TValue& a_value)
 
 
 #define VOB_MISVI_NVP(name, attribute) \
-a_visitor.visit(vob::misvi::nvp(name, a_value.m_##attribute))
+a_visitor.visit(vob::misvi::nvp(name, a_value.attribute))
+

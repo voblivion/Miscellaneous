@@ -20,8 +20,8 @@ namespace vob::mistd
 	template <typename TEnum>
 	struct reflected_enum_range
 	{
-		static constexpr auto begin = TEnum{ VOB_MISTD_REFLECTED_ENUM_RANGE_MIN };
-		static constexpr auto end = TEnum{ VOB_MISTD_REFLECTED_ENUM_RANGE_MAX };
+		static constexpr auto begin = static_cast<TEnum>(std::is_signed_v<std::underlying_type_t<TEnum>> ? VOB_MISTD_REFLECTED_ENUM_RANGE_MIN : 0);
+		static constexpr auto end = static_cast<TEnum>(VOB_MISTD_REFLECTED_ENUM_RANGE_MAX);
 	};
 
 	namespace detail
@@ -29,8 +29,8 @@ namespace vob::mistd
 		template <typename TEnum, typename TReflectedRange>
 		constexpr auto enum_traits_reflected_sequence = integer_sequence_util::make_range<
 			std::underlying_type_t<TEnum>,
-			std::underlying_type_t<TEnum>{ TReflectedRange::begin },
-			std::underlying_type_t<TEnum>{ TReflectedRange::end }>();
+			static_cast<std::underlying_type_t<TEnum>>(TReflectedRange::begin),
+			static_cast<std::underlying_type_t<TEnum>>(TReflectedRange::end)>();
 
 		template <typename TEnum>
 		struct enum_traits_is_valid
@@ -134,7 +134,10 @@ namespace vob::mistd
 		template <TEnum t_value>
 		static constexpr auto value_name = reflection_util::enum_value_name<TEnum>(t_value);
 
-		static constexpr auto valie_indexes = detail::enum_traits_valid_indexes<TEnum, TReflectedRange>;
+		static constexpr auto valid_indices = detail::enum_traits_valid_indexes<TEnum, TReflectedRange>;
+		static constexpr auto valid_begin = static_cast<TEnum>(integer_sequence_util::front(valid_indices));
+		static constexpr auto valid_end = static_cast<TEnum>(integer_sequence_util::back(valid_indices) + 1);
+		// static constexpr auto valid_count = static_cast<size_t>(integer_sequence_util::back(valid_indices)) + 1ull;
 		static constexpr auto valid_values = detail::enum_traits_valid_values<TEnum, TReflectedRange>;
 		static constexpr auto valid_value_names = detail::enum_traits_valid_value_names<TEnum, TReflectedRange>;
 		static constexpr auto valid_value_name_pairs =
