@@ -57,7 +57,7 @@ namespace vob::mistd
 
 		template <typename TEnum, std::underlying_type_t<TEnum>... t_indexes>
 		constexpr auto enum_traits_get_values(
-			std::integer_sequence<std::underlying_type_t<TEnum>, t_indexes...> a_sequence)
+			[[maybe_unused]] std::integer_sequence<std::underlying_type_t<TEnum>, t_indexes...> a_sequence)
 		{
 			return std::array<TEnum, sizeof...(t_indexes)>{{ TEnum{ t_indexes }... }};
 		}
@@ -68,7 +68,7 @@ namespace vob::mistd
 
 		template <typename TEnum, std::underlying_type_t<TEnum>... t_indexes>
 		constexpr auto enum_traits_get_value_names(
-			std::integer_sequence<std::underlying_type_t<TEnum>, t_indexes...> a_sequence)
+			[[maybe_unused]] std::integer_sequence<std::underlying_type_t<TEnum>, t_indexes...> a_sequence)
 		{
 			return std::array<std::string_view, sizeof...(t_indexes)>{{
 				reflection_util::enum_value_name<TEnum, TEnum{ t_indexes }>()...
@@ -81,7 +81,7 @@ namespace vob::mistd
 
 		template <typename TEnum, std::underlying_type_t<TEnum>... t_indexes>
 		constexpr auto enum_traits_get_value_name_pairs(
-			std::integer_sequence<std::underlying_type_t<TEnum>, t_indexes...> a_sequence)
+			[[maybe_unused]] std::integer_sequence<std::underlying_type_t<TEnum>, t_indexes...> a_sequence)
 		{
 			return std::array<std::pair<TEnum, std::string_view>, sizeof...(t_indexes)>{{
 				{

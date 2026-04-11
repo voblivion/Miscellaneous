@@ -16,7 +16,7 @@ namespace vob::mistd
 	template <
 		typename TValue,
 		typename TAllocator = std::allocator<TValue>,
-		typename TKey = uint64_t,
+		typename TKey = int64_t,
 		uint8_t t_versionBits = 24>
 	class id_map
 	{

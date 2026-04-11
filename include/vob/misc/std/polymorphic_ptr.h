@@ -43,7 +43,7 @@ namespace vob::mistd
 				: m_block{ a_block }
 			{}
 
-			void operator()(void* a_ptr)
+			void operator()([[maybe_unused]] void* a_ptr)
 			{
 				if (m_block != nullptr)
 				{
