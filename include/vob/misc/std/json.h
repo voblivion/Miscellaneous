@@ -378,7 +378,7 @@ namespace vob::mistd
 	std::istream& operator>>(std::istream& a_inputStream, basic_json_object<TAllocator>& a_object)
 	{
 		a_inputStream >> std::ws;
-		char c = a_inputStream.get();
+		auto c = a_inputStream.get();
 		if (c != '{')
 		{
 			a_inputStream.setstate(std::ios_base::failbit);
@@ -425,7 +425,7 @@ namespace vob::mistd
 	std::istream& operator>>(std::istream& a_inputStream, basic_json_array<TAllocator>& a_array)
 	{
 		a_inputStream >> std::ws;
-		char c = a_inputStream.get();
+		auto c = a_inputStream.get();
 		if (c != '[')
 		{
 			a_inputStream.setstate(std::ios_base::failbit);
@@ -544,7 +544,7 @@ namespace vob::mistd
 				a_inputStream.setstate(std::ios_base::failbit);
 				return false;
 			}
-			char const c = a_inputStream.peek();
+			auto const c = a_inputStream.peek();
 			if (c >= a_min && c <= a_max)
 			{
 				representation[index++] = static_cast<char>(a_inputStream.get());

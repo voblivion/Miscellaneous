@@ -347,7 +347,6 @@ namespace vob::misvi
 		// TODO
 		auto const& context = a_visitor.get_context();
 		auto const& factory = context.get_factory();
-		auto const& registry = factory.get_registry();
 		mishs::string_id id;
 		if (!a_visitor.visit(nvp("type_id", id)))
 		{
