@@ -12,6 +12,7 @@
 #include <cassert>
 #include <charconv>
 #include <deque>
+#include <optional>
 #include <stack>
 
 
@@ -49,12 +50,13 @@ namespace vob::misvi
 		}
 
 		template <typename TValue>
-		void read(TIniValue const& a_iniValue, TValue& a_value)
+		bool read(TIniValue const& a_iniValue, TValue& a_value)
 		{
 			assert(m_stack.empty());
 			m_stack.emplace(a_iniValue);
-			visit(a_value);
+			auto const result = visit(a_value);
 			m_stack.pop();
+			return result;
 		}
 
 		template <typename TValue>
@@ -179,6 +181,32 @@ namespace vob::misvi
 			m_stack.emplace(valueIt->second);
 			auto result = visit(a_nameValuePair.value);
 			m_stack.pop();
+			return result;
+		}
+
+		template <typename TValue>
+		bool visit(name_value_pair<std::optional<TValue>> a_nameValuePair)
+		{
+			auto const object = m_stack.top().get().template get<typename TIniValue::object_type>();
+			if (object == nullptr)
+			{
+				return false;
+			}
+
+			auto const valueIt = object->data.find(a_nameValuePair.name);
+			if (valueIt == object->data.end())
+			{
+				a_nameValuePair.value.reset();
+				return true;
+			}
+
+			m_stack.emplace(valueIt->second);
+			auto const result = visit(a_nameValuePair.value.emplace());
+			m_stack.pop();
+			if (!result)
+			{
+				a_nameValuePair.value.reset();
+			}
 			return result;
 		}
 

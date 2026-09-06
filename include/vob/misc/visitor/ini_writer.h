@@ -12,6 +12,7 @@
 #include <cassert>
 #include <charconv>
 #include <deque>
+#include <optional>
 #include <stack>
 
 
@@ -49,12 +50,13 @@ namespace vob::misvi
 		}
 
 		template <typename TValue>
-		void write(TIniValue& a_iniValue, TValue const& a_value)
+		bool write(TIniValue& a_iniValue, TValue const& a_value)
 		{
 			assert(m_stack.empty());
 			m_stack.emplace(a_iniValue);
-			visit(a_value);
+			auto const result = visit(a_value);
 			m_stack.pop();
+			return result;
 		}
 
 		template <typename TValue>
@@ -143,25 +145,23 @@ namespace vob::misvi
 		template <typename TValue>
 		bool visit(name_value_pair<TValue> a_nameValuePair)
 		{
-			auto object = current().template get<typename TIniValue::object_type>();
-			if (object == nullptr)
+			m_stack.emplace(entry(a_nameValuePair.name));
+			auto const result = visit(a_nameValuePair.value);
+			m_stack.pop();
+			return result;
+		}
+
+		template <typename TValue>
+		bool visit(name_value_pair<std::optional<TValue> const> a_nameValuePair)
+		{
+			if (!a_nameValuePair.value.has_value())
 			{
-				object = &current().template set<typename TIniValue::object_type>(
-					current().get_allocator());
+				ensure_object();
+				return true;
 			}
 
-			auto valueIt = object->data.find(a_nameValuePair.name);
-			if (valueIt == object->data.end())
-			{
-				using string_type = typename TIniValue::object_type::string_type;
-				object->data.emplace(
-					string_type{ a_nameValuePair.name },
-					TIniValue{ current().get_allocator() });
-				valueIt = object->data.find(a_nameValuePair.name);
-			}
-
-			m_stack.emplace(valueIt->second);
-			auto result = visit(a_nameValuePair.value);
+			m_stack.emplace(entry(a_nameValuePair.name));
+			auto const result = visit(*a_nameValuePair.value);
 			m_stack.pop();
 			return result;
 		}
@@ -176,6 +176,30 @@ namespace vob::misvi
 		TIniValue& current()
 		{
 			return m_stack.top().get();
+		}
+
+		typename TIniValue::object_type& ensure_object()
+		{
+			auto object = current().template get<typename TIniValue::object_type>();
+			if (object == nullptr)
+			{
+				object = &current().template set<typename TIniValue::object_type>(
+					current().get_allocator());
+			}
+			return *object;
+		}
+
+		TIniValue& entry(std::string_view const a_name)
+		{
+			auto& object = ensure_object();
+			auto valueIt = object.data.find(a_name);
+			if (valueIt == object.data.end())
+			{
+				using string_type = typename TIniValue::object_type::string_type;
+				object.data.emplace(string_type{ a_name }, TIniValue{ current().get_allocator() });
+				valueIt = object.data.find(a_name);
+			}
+			return valueIt->second;
 		}
 
 		void set_literal(std::string_view const a_text)
