@@ -66,12 +66,19 @@ namespace vob::mistd
 		constexpr auto enum_traits_valid_values = enum_traits_get_values<TEnum>(
 			enum_traits_valid_indexes<TEnum, TReflectedRange>);
 
+		constexpr auto enum_traits_unqualified_name(std::string_view const a_name)
+		{
+			auto const scopeEnd = a_name.rfind("::");
+			return scopeEnd == std::string_view::npos ? a_name : a_name.substr(scopeEnd + 2);
+		}
+
 		template <typename TEnum, std::underlying_type_t<TEnum>... t_indexes>
 		constexpr auto enum_traits_get_value_names(
 			[[maybe_unused]] std::integer_sequence<std::underlying_type_t<TEnum>, t_indexes...> a_sequence)
 		{
 			return std::array<std::string_view, sizeof...(t_indexes)>{{
-				reflection_util::enum_value_name<TEnum, TEnum{ t_indexes }>()...
+				enum_traits_unqualified_name(
+					reflection_util::enum_value_name<TEnum, TEnum{ t_indexes }>())...
 			}};
 		}
 
@@ -86,7 +93,8 @@ namespace vob::mistd
 			return std::array<std::pair<TEnum, std::string_view>, sizeof...(t_indexes)>{{
 				{
 					TEnum{ t_indexes },
-					reflection_util::enum_value_name<TEnum, TEnum{ t_indexes }>()
+					enum_traits_unqualified_name(
+						reflection_util::enum_value_name<TEnum, TEnum{ t_indexes }>())
 				}...
 			}};
 		}
@@ -132,7 +140,8 @@ namespace vob::mistd
 #pragma region CLASS_DATA
 		static constexpr auto name = reflection_util::enum_name<TEnum>();
 		template <TEnum t_value>
-		static constexpr auto value_name = reflection_util::enum_value_name<TEnum>(t_value);
+		static constexpr auto value_name = detail::enum_traits_unqualified_name(
+			reflection_util::enum_value_name<TEnum, t_value>());
 
 		static constexpr auto valid_indices = detail::enum_traits_valid_indexes<TEnum, TReflectedRange>;
 		static constexpr auto valid_begin = static_cast<TEnum>(integer_sequence_util::front(valid_indices));
