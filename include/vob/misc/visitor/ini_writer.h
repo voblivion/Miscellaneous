@@ -12,7 +12,6 @@
 #include <cassert>
 #include <charconv>
 #include <deque>
-#include <optional>
 #include <stack>
 
 
@@ -147,21 +146,6 @@ namespace vob::misvi
 		{
 			m_stack.emplace(entry(a_nameValuePair.name));
 			auto const result = visit(a_nameValuePair.value);
-			m_stack.pop();
-			return result;
-		}
-
-		template <typename TValue>
-		bool visit(name_value_pair<std::optional<TValue> const> a_nameValuePair)
-		{
-			if (!a_nameValuePair.value.has_value())
-			{
-				ensure_object();
-				return true;
-			}
-
-			m_stack.emplace(entry(a_nameValuePair.name));
-			auto const result = visit(*a_nameValuePair.value);
 			m_stack.pop();
 			return result;
 		}
