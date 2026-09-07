@@ -472,7 +472,7 @@ namespace vob::misvi
 	bool accept(TVisitor& a_visitor, std::optional<TValue> const& a_optional)
 	{
 		a_visitor.visit(nvp("has_value", a_optional.has_value()));
-		if (a_visitor.has_value())
+		if (a_optional.has_value())
 		{
 			a_visitor.visit(nvp("value", a_optional.value()));
 		}
