@@ -66,6 +66,12 @@ namespace vob::mistd
 			return m_size;
 		}
 
+		/// @brief Provides the number of elements the container can hold.
+		static constexpr auto capacity() noexcept
+		{
+			return t_maxSize;
+		}
+
 		/// @brief Provides a pointer to the underlying array serving as element storage.
 		/// 
 		/// The pointer is such that range [data(); data() + size()) is always a valid range, even if the container is
@@ -155,6 +161,43 @@ namespace vob::mistd
 			assert(m_size < t_maxSize && "Adding a value in a full bounded_vector.");
 			auto ptr = begin() + m_size++;
 			return *(new(ptr) TValue{ std::forward<TArgs>(a_args)... });
+		}
+
+		/// @brief Adds a value at the end of the container if it isn't full, constructed by move.
+		///
+		/// @return A pointer to the added value, or nullptr if the container was full.
+		constexpr TValue* try_push_back(TValue&& a_value) noexcept
+		{
+			if (m_size >= t_maxSize)
+			{
+				return nullptr;
+			}
+			return &push_back(std::move(a_value));
+		}
+
+		/// @brief Adds a value at the end of the container if it isn't full, constructed by copy.
+		///
+		/// @return A pointer to the added value, or nullptr if the container was full.
+		constexpr TValue* try_push_back(TValue const& a_value) noexcept
+		{
+			if (m_size >= t_maxSize)
+			{
+				return nullptr;
+			}
+			return &push_back(a_value);
+		}
+
+		/// @brief Constructs a value directly at the end of the container if it isn't full.
+		///
+		/// @return A pointer to the constructed value, or nullptr if the container was full.
+		template <typename... TArgs>
+		constexpr TValue* try_emplace_back(TArgs&&... a_args) noexcept
+		{
+			if (m_size >= t_maxSize)
+			{
+				return nullptr;
+			}
+			return &emplace_back(std::forward<TArgs>(a_args)...);
 		}
 
 		/// @brief Removes the last element of the container.
