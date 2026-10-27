@@ -239,17 +239,29 @@ namespace vob::misvi
 #pragma endregion
 
 #pragma region std::variant
+	template <typename TVisitor>
+	bool accept([[maybe_unused]] TVisitor& a_visitor, [[maybe_unused]] std::monostate& a_value)
+	{
+		return true;
+	}
+
+	template <typename TVisitor>
+	bool accept([[maybe_unused]] TVisitor& a_visitor, [[maybe_unused]] std::monostate const& a_value)
+	{
+		return true;
+	}
+
 	template <typename TVisitor, typename TFactory, typename... TValues>
 	bool accept(TVisitor& a_visitor, std::variant<TValues...>& a_variant, TFactory a_factory)
 	{
 		std::size_t index{ a_variant.index() };
-		if (!a_visitor.visit(nvp("index", index)))
+		if (!a_visitor.visit(nvp("index", index)) || index >= sizeof...(TValues))
 		{
 			return false;
 		}
 
 		a_variant = a_factory(index);
-		return std::visit([a_visitor](auto&& a_value)
+		return std::visit([&a_visitor](auto&& a_value)
 		{
 			return a_visitor.visit(nvp("data", a_value));
 		}, a_variant);
@@ -270,7 +282,7 @@ namespace vob::misvi
 		std::visit([&a_visitor](auto&& a_value)
 		{
 			a_visitor.visit(nvp("data", a_value));
-		});
+		}, a_variant);
 		return true;
 	}
 #pragma endregion
