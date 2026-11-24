@@ -329,8 +329,7 @@ namespace vob::misvi
 	bool accept(TVisitor& a_visitor, std::shared_ptr<TBase>& a_ptr)
 	{
 		// TODO
-		auto const& context = a_visitor.get_context();
-		auto const& factory = context.get_factory();
+		auto const& factory = get_factory(a_visitor);
 		auto const& registry = factory.get_registry();
 		mishs::string_id id;
 		if (!a_visitor.visit(nvp("type_id", id)))
@@ -357,8 +356,7 @@ namespace vob::misvi
 	bool accept(TVisitor& a_visitor, mistd::polymorphic_ptr<TBase>& a_ptr)
 	{
 		// TODO
-		auto const& context = a_visitor.get_context();
-		auto const& factory = context.get_factory();
+		auto const& factory = get_factory(a_visitor);
 		mishs::string_id id;
 		if (!a_visitor.visit(nvp("type_id", id)))
 		{
