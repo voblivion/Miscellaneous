@@ -57,6 +57,12 @@ namespace vob::misvi
 
 #pragma region MANIPULATORS
 		/// @brief TODO
+		[[nodiscard]] auto& get_context()
+		{
+			return m_context;
+		}
+
+		/// @brief TODO
 		template <typename TValue>
 		void read(TJsonValue const& a_jsonValue, TValue& a_value)
 		{
