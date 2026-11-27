@@ -102,6 +102,12 @@ namespace vob::mistd
 		}
 
 		/// @brief TODO
+		void clear()
+		{
+			m_data.clear();
+		}
+
+		/// @brief TODO
 		auto begin()
 		{
 			return m_data.begin();

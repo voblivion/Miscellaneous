@@ -8,6 +8,7 @@
 #include "size_tag.h"
 
 #include "../hash/string_id.h"
+#include "../std/bounded_vector.h"
 #include "../std/enum_traits.h"
 #include "../std/ignorable_assert.h"
 #include "../std/polymorphic_ptr.h"
@@ -196,6 +197,39 @@ namespace vob::misvi
 
 	template <typename TVisitor, typename TValue, typename TAllocator>
 	bool accept(TVisitor& a_visitor, std::vector<TValue, TAllocator> const& a_vector)
+	{
+		size_tag sizeTag{ a_vector.size() };
+		a_visitor.visit(sizeTag);
+		auto index = 0u;
+		for (auto item : a_vector)
+		{
+			a_visitor.visit(ivp(index++, item));
+		}
+		return true;
+	}
+#pragma endregion
+
+#pragma region mistd::bounded_vector
+	template <typename TVisitor, typename TValue, std::size_t t_maxSize, typename TFactory = factory<TValue>>
+	bool accept(TVisitor& a_visitor, mistd::bounded_vector<TValue, t_maxSize>& a_vector, TFactory a_factory = {})
+	{
+		size_tag sizeTag{};
+		if (!a_visitor.visit(sizeTag) || sizeTag.size > t_maxSize)
+		{
+			return false;
+		}
+		a_vector.clear();
+		for (auto index = 0u; index < sizeTag.size; ++index)
+		{
+			auto item = a_factory();
+			a_visitor.visit(ivp(index, item));
+			a_vector.push_back(std::move(item));
+		}
+		return true;
+	}
+
+	template <typename TVisitor, typename TValue, std::size_t t_maxSize>
+	bool accept(TVisitor& a_visitor, mistd::bounded_vector<TValue, t_maxSize> const& a_vector)
 	{
 		size_tag sizeTag{ a_vector.size() };
 		a_visitor.visit(sizeTag);
